@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+    <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Holodeck Velocity: Quantum Math Blaster</title>
+  <!-- Local Three.js for 100% reliable offline zero-lag loading -->
+  <script src="three.min.js?v=1.0.1" defer></script>
+  <!-- Google Fonts for futuristic LCARS sci-fi look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=3.2.0" />
+</head>
+<body>
+
+  <!-- Red Alert Fullscreen Glow Overlay -->
+  <div id="red-alert-flash"></div>
+
+  <!-- Screen Shake Container -->
+  <div id="app-viewport">
+    <!-- 3D Three.js WebGL Canvas -->
+    <div id="canvas-container"></div>
+    <div id="pause-bokeh-overlay"></div>
+
+    <!-- Enhanced Temporal Jam Chromatic Aberration & Spacetime Warping Overlay -->
+    <div id="temporal-jam-fx">
+      <div class="jam-radial-warp"></div>
+      <div class="jam-grid-distortion"></div>
+      <div class="jam-chromatic-vignette"></div>
+      <div class="jam-scanlines"></div>
+      <div class="jam-status-badge">⚡ CHRONITON DILATION ACTIVE // 0.30x TIME FLOW</div>
+    </div>
+
+    <!-- In-game Target Reticle (Zero Latency) -->
+    <div id="crosshair">
+      <div class="crosshair-ring"></div>
+    </div>
+
+    <!-- Real-time FPS & Render Stats Display (Toggle [F]) -->
+    <div id="lcars-stats-hud" class="hidden">
+      <span class="stats-item fps-good" id="stats-fps">60 FPS</span>
+      <span class="stats-sep">|</span>
+      <span class="stats-item" id="stats-targets">🎯 4 TARGETS</span>
+      <span class="stats-sep">|</span>
+      <span class="stats-item" id="stats-particles">✨ 0 PARTICLES</span>
+      <span class="stats-sep">|</span>
+      <span class="stats-item" id="stats-warp">WARP 1.0</span>
+    </div>
+
+    <!-- Center Toast/Notification Banner -->
+    <div id="center-banner">WARP FACTOR 3!</div>
+
+    <!-- ENHANCED LCARS INTERMISSION & REVIEW CARD (4.5s Review for both Success & Failure) -->
+    <div id="level-transition-card" class="hidden">
+      <div class="lt-header-pill" id="lt-header-pill">🎯 TARGET VAPORIZED // MATRIX SOLVED</div>
+      
+      <!-- Big Prominent Solved Equation Display with Correct Answer -->
+      <div class="lt-equation-box" id="lt-equation-box">
+        <div class="lt-eq-category" id="lt-eq-category">CALCULUS MATRIX</div>
+        <div class="lt-eq-formula">
+          <span id="lt-eq-question">d/dx (x² + 3x) [x=1]</span> = <span class="lt-eq-answer" id="lt-eq-answer">5</span>
+        </div>
+      </div>
+
+      <!-- Score & Energy Breakdown -->
+      <div class="lt-stats-grid">
+        <div class="lt-stat-item">
+          <div class="lt-stat-lbl" id="lt-stat-lbl-1">STREAK BONUS</div>
+          <div class="lt-stat-val gold" id="lt-streak-text">1X STREAK</div>
+        </div>
+        <div class="lt-stat-item">
+          <div class="lt-stat-lbl" id="lt-stat-lbl-2">POINTS EARNED</div>
+          <div class="lt-stat-val green" id="lt-points-text">+250 PTS</div>
+        </div>
+        <div class="lt-stat-item">
+          <div class="lt-stat-lbl" id="lt-stat-lbl-3">WARP SPEED</div>
+          <div class="lt-stat-val purple" id="lt-warp-badge">WARP 2.0</div>
+        </div>
+      </div>
+
+      <div class="lt-next-info" id="lt-next-info">WAVE 2 TIME LIMIT: 47.2s</div>
+      <div class="lt-countdown" id="lt-countdown">WARP SPEED IN 4...</div>
+    </div>
+
+    <!-- RIGHT LCARS DOCK: Auto-Stacked Flex Container (Guaranteed ZERO OVERLAP) -->
+    <div id="lcars-right-dock">
+      <!-- 1. LCARS CALCULUS VISUALIZER HOLOGRAM -->
+      <div id="lcars-visualizer-panel" class="voyager-containment-dock hidden">
+        <div class="voyager-arch-top vis-arch-header vis-header" id="vis-arch-header" style="cursor: pointer;">
+          <div class="voyager-arch-elbow vis-elbow"></div>
+          <div class="voyager-arch-fill vis-fill">
+            <div class="v-arch-title">
+              <span class="v-arch-title-full">VISUALIZER</span>
+              <span class="v-arch-title-short">VISUALIZER</span>
+            </div>
+            <div class="v-arch-code vis-code" id="vis-arch-code">
+              <span class="v-arch-code-full">LCARS 47</span>
+              <span class="v-arch-code-short">47</span>
+            </div>
+          </div>
+          <div class="vis-header-actions">
+            <button class="vis-btn-pill" id="btn-vis-toggle-ans">👁️ ANS: SHOW</button>
+            <button class="vis-btn-pill vis-btn-min" id="btn-vis-minimize">▲</button>
+            <button class="vis-btn-pill vis-btn-close" id="btn-vis-close">✕ CLOSE</button>
+          </div>
+        </div>
+        <div class="vis-content">
+          <div class="vis-graph-wrap">
+            <canvas id="math-graph-canvas" width="340" height="200"></canvas>
+          </div>
+          <div class="vis-info-panel">
+            <div class="vis-topic-tag" id="vis-topic-tag">DERIVATIVE MATRIX (TANGENT SLOPE)</div>
+            <div class="vis-formula-box" id="vis-formula-box">f(x) = x² + 3x</div>
+            <div class="vis-hint-text" id="vis-hint-text">
+              • <b>Derivative Concept</b>: Find the instantaneous rate of change (tangent slope) at the marked point.<br>
+              • <b>Power Rule</b>: d/dx [a·xⁿ] = a·n·xⁿ⁻¹
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. AUTHENTIC VOYAGER LCARS TACTICAL SHIELD CONSOLE -->
+      <div class="voyager-containment-dock" id="voyager-shield-panel">
+        <div class="voyager-arch-top" id="shield-arch-header" style="cursor: pointer;">
+          <div class="voyager-arch-elbow"></div>
+          <div class="voyager-arch-fill">
+            <div class="v-arch-title">
+              <span class="v-arch-title-full">TACTICAL SHIELDS</span>
+              <span class="v-arch-title-short">SHIELDS</span>
+            </div>
+            <div class="v-arch-code" id="shield-arch-code">
+              <span class="v-arch-code-full">LCARS 927</span>
+              <span class="v-arch-code-short">927</span>
+            </div>
+          </div>
+          <button class="voyager-arch-end" id="btn-shield-minimize">▲</button>
+        </div>
+
+        <div class="voyager-dock-body">
+          <div class="v-telemetry-row">
+            <div class="v-pill-btn v-peach" id="shield-freq-tag" style="cursor: pointer;">FREQ 434.8</div>
+            <div class="v-pill-btn v-periwinkle" id="shield-flux-tag" style="cursor: pointer;">GRID FLUX</div>
+            <div class="v-pill-btn v-mauve" id="shield-matrix-tag" style="cursor: pointer;">PRIMARY ACTIVE</div>
+          </div>
+
+          <div class="voyager-shield-schematic">
+            <div class="v-capsule-frame">
+              <div class="v-capsule-track">
+                <div class="v-shield-ring" id="v-shield-oval">
+                  <div class="v-shield-core">
+                    <span class="v-shield-pct" id="shield-pct-text">100%</span>
+                    <span class="v-shield-status-lbl">CONTAINMENT</span>
+                  </div>
+                </div>
+              </div>
+              <!-- 3 Strength Indicator Dots (Active in Corner Dock Mode) -->
+              <div class="v-shield-dots" id="v-shield-dots">
+                <span class="v-shield-dot active" id="v-dot-1"></span>
+                <span class="v-shield-dot active" id="v-dot-2"></span>
+                <span class="v-shield-dot active" id="v-dot-3"></span>
+              </div>
+            </div>
+
+            <div class="voyager-segmented-levels" id="shield-cells">
+              <div class="v-level-row active" id="shield-cell-1">
+                <span class="v-level-tag">030</span>
+                <div class="v-level-bar"></div>
+                <span class="v-level-lbl">PRIMARY</span>
+              </div>
+              <div class="v-level-row active" id="shield-cell-2">
+                <span class="v-level-tag">020</span>
+                <div class="v-level-bar"></div>
+                <span class="v-level-lbl">SECONDARY</span>
+              </div>
+              <div class="v-level-row active" id="shield-cell-3">
+                <span class="v-level-tag">010</span>
+                <div class="v-level-bar"></div>
+                <span class="v-level-lbl">TERTIARY</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="voyager-bottom-band">
+            <span class="v-band-code">SEC 451</span>
+            <div class="v-band-fill"></div>
+            <span class="v-band-rank" id="hud-rank">FLEET ADMIRAL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LCARS Sci-Fi HUD Overlay -->
+    <div id="ui-overlay">
+      <!-- Top LCARS Bar -->
+      <div class="lcars-header">
+        <div class="lcars-pill-main" id="hud-holodeck-pill">
+          <div class="pill-holodeck-stack">
+            <span class="holodeck-label">HOLODECK</span>
+            <span class="holodeck-status-tag">IN USE</span>
+          </div>
+        </div>
+        <div class="lcars-bar-seg seg-purple" id="hud-mode-tag">TARGET ASSAULT</div>
+        <div class="lcars-header-fill"></div>
+        <div class="lcars-header-controls">
+          <div class="lcars-dropdown-container" id="ricochet-dropdown-wrap">
+            <button class="lcars-btn-sm" id="btn-ricochet-sfx">
+              🔊 SFX: TACHYON [R] ▾
+            </button>
+            <div class="lcars-dropdown-menu hidden" id="ricochet-sfx-menu">
+              <div class="lcars-dropdown-item" data-sfx="baseline">
+                <span class="sfx-name">1. Baseline Chirp</span>
+                <span class="sfx-desc">Classic 680Hz-1.8kHz upward sweep</span>
+              </div>
+              <div class="lcars-dropdown-item" data-sfx="harmonic">
+                <span class="sfx-name">2. Harmonic Triad</span>
+                <span class="sfx-desc">Resonant C5-E5-G5 crystal chord</span>
+              </div>
+              <div class="lcars-dropdown-item" data-sfx="deep_bass">
+                <span class="sfx-name">3. Deep Bass Boop</span>
+                <span class="sfx-desc">Punchy 185Hz-52Hz sub-bass thump</span>
+              </div>
+              <div class="lcars-dropdown-item" data-sfx="warp_ping">
+                <span class="sfx-name">4. Starfleet Ping</span>
+                <span class="sfx-desc">1760Hz crystal bridge console chime</span>
+              </div>
+              <div class="lcars-dropdown-item active" data-sfx="tachyon_deflect">
+                <span class="sfx-name">5. Tachyon Deflect</span>
+                <span class="sfx-desc">Sci-Fi 1450Hz-320Hz beam deflect</span>
+              </div>
+            </div>
+          </div>
+          <button class="lcars-btn-sm" id="btn-stats-toggle">📊 FPS [F]</button>
+          <button class="lcars-btn-sm" id="btn-voice-toggle">🎙️ VOICE: COMMANDER [T]</button>
+          <button class="lcars-btn-sm" id="btn-mute-toggle">🔊 MUTE [M]</button>
+          <button class="lcars-btn-sm" id="btn-ambient-toggle">🌌 AMBIENT [A]</button>
+          <button class="lcars-btn-sm active" id="btn-visualizer-toggle">🔬 VISUALIZER [V]</button>
+          <button class="lcars-btn-sm" id="btn-pause">⏸️ PAUSE</button>
+        </div>
+      </div>
+
+      <!-- Left Data Panel: Sector, Score, High Score & Warp Factor -->
+      <div class="hud-panel left-panel">
+        <div class="hud-sector-block" id="hud-sector-container" style="margin-bottom: 6px; cursor: pointer;">
+          <div class="hud-label">STELLAR SECTOR</div>
+          <div class="hud-value" style="font-size: 0.84rem; color: var(--voyager-peach); letter-spacing: 1px;" id="hud-sector">BETELGEUSE</div>
+        </div>
+
+        <div>
+          <div class="hud-label">QUANTUM SCORE</div>
+          <div class="hud-value gold" id="hud-score">0000</div>
+        </div>
+
+        <div style="margin-top: 5px;">
+          <div class="hud-label">RECORD HIGH</div>
+          <div class="hud-value" style="font-size: 1.15rem; color: #ffaa00;" id="hud-highscore">0000</div>
+        </div>
+        
+        <div style="margin-top: 6px;">
+          <div class="hud-label">LEVEL / WAVE</div>
+          <div class="hud-value cyan" style="font-size: 1.25rem;" id="hud-level">WAVE 1</div>
+        </div>
+
+        <div style="margin-top: 6px;">
+          <div class="hud-label">WARP FACTOR</div>
+          <div class="hud-value purple" style="font-size: 1.25rem;" id="hud-warp">WARP 1.0</div>
+        </div>
+
+        <div style="margin-top: 6px;">
+          <div class="hud-label">MISSION TIME</div>
+          <div class="hud-value" style="font-size: 1.1rem;" id="hud-timer">00:00</div>
+        </div>
+      </div>
+
+      <!-- Dedicated LCARS Sandbox Telemetry & Testing Console (Active in Test Mode) -->
+      <div class="hud-panel sandbox-panel hidden" id="test-sandbox-panel">
+        <!-- Chrome-Like Testing Matrix Tab Bar at the Very Top -->
+        <div class="sandbox-tab-bar" id="sandbox-tab-header">
+          <button class="sandbox-tab active" data-tab="targets">🎯 TARGETS</button>
+          <button class="sandbox-tab" data-tab="tactical">⚡ TACTICAL</button>
+          <button class="sandbox-tab" data-tab="ships">🚀 SHIPS</button>
+          <button class="sandbox-tab" data-tab="audio">🌌 AUDIO/ENV</button>
+          <button class="sandbox-tab" data-tab="debrief">📊 DEBRIEF</button>
+          <button class="sandbox-tab" data-tab="recorder">🎥 REC</button>
+        </div>
+
+        <!-- Sub-Header Bar with Title & Pause Velocity Button -->
+        <div class="sandbox-header" id="sandbox-drag-header" style="cursor: move;">
+          <span class="sandbox-title">⚡ LCARS TEST MATRIX</span>
+          <button class="sandbox-badge" id="btn-sandbox-pause-vel">⏸️ PAUSE VEL</button>
+        </div>
+
+        <!-- Tab 1: 🎯 TARGET KINEMATICS -->
+        <div class="sandbox-tab-content active" id="stab-targets">
+          <div class="sandbox-group">
+            <div class="sandbox-lbl">TARGET COUNT</div>
+            <div class="sandbox-pills" id="sandbox-target-pills">
+              <button class="sandbox-pill active" data-count="1">1</button>
+              <button class="sandbox-pill" data-count="2">2</button>
+              <button class="sandbox-pill" data-count="3">3</button>
+              <button class="sandbox-pill" data-count="4">4</button>
+            </div>
+          </div>
+
+          <div class="sandbox-group">
+            <div class="sandbox-slider-hdr">
+              <span class="sandbox-lbl">VELOCITY</span>
+              <span class="sandbox-val" id="val-sandbox-speed">0.50x</span>
+            </div>
+            <input type="range" class="lcars-range-slider" id="slider-sandbox-speed" min="0" max="38" step="1" value="10">
+          </div>
+
+          <div class="sandbox-group">
+            <div class="sandbox-slider-hdr">
+              <span class="sandbox-lbl">SPIN RATE</span>
+              <span class="sandbox-val" id="val-sandbox-spin">0.5x</span>
+            </div>
+            <input type="range" class="lcars-range-slider" id="slider-sandbox-spin" min="0.0" max="3.0" step="0.1" value="0.5">
+          </div>
+
+          <div class="sandbox-group">
+            <div class="sandbox-slider-hdr">
+              <span class="sandbox-lbl">INTERNAL GLOW</span>
+              <span class="sandbox-val" id="val-sandbox-glow">0.8x</span>
+            </div>
+            <input type="range" class="lcars-range-slider" id="slider-sandbox-glow" min="0.0" max="20.0" step="0.2" value="0.8">
+          </div>
+
+          <div class="sandbox-group">
+            <div class="sandbox-slider-hdr">
+              <span class="sandbox-lbl">NUMERAL HIGHLIGHT</span>
+              <span class="sandbox-val" id="val-sandbox-text-highlight">0.5x</span>
+            </div>
+            <input type="range" class="lcars-range-slider" id="slider-sandbox-text-highlight" min="0.0" max="3.0" step="0.1" value="0.5">
+          </div>
+
+          <div class="sandbox-group">
+            <div class="sandbox-slider-hdr">
+              <span class="sandbox-lbl">EXPLOSION PARTICLES</span>
+              <span class="sandbox-val" id="val-sandbox-particles">250</span>
+            </div>
+            <input type="range" class="lcars-range-slider" id="slider-sandbox-particles" min="50" max="600" step="25" value="250">
+          </div>
+
+          <button class="sandbox-recenter-btn" id="btn-sandbox-respawn">
+            🔄 RE-CENTER TARGETS
+          </button>
+        </div>
+
+        <!-- Tab 2: ⚡ TACTICAL & WEAPONS FX -->
+        <div class="sandbox-tab-content" id="stab-tactical">
+          <div class="sandbox-btn-grid">
+            <button class="sandbox-tool-btn" id="btn-test-explosion">💥 EXPLOSION FX</button>
+            <button class="sandbox-tool-btn" id="btn-test-jam">⏳ TRIGGER JAM 5s</button>
+            <button class="sandbox-tool-btn" id="btn-test-phaser">💥 DISRUPTOR STRIKE</button>
+            <button class="sandbox-tool-btn" id="btn-test-beamin">✨ BEAM-IN SHIMMER</button>
+            <button class="sandbox-tool-btn" id="btn-test-shake">💢 SCREEN SHAKE</button>
+          </div>
+
+          <div class="sandbox-subhdr">HOLOGRAPHIC & COMBAT FX SUITE</div>
+          <div class="sandbox-btn-grid" style="grid-template-columns: 1fr 1fr; gap: 3px;">
+            <button class="sandbox-tool-btn" id="btn-test-hex-shield">🛡️ HEX SHIELD IMPACT</button>
+            <button class="sandbox-tool-btn" id="btn-test-pov-smash" style="border-color: #ff3355; color: #ff3355;">💥 POV WRONG SMASH</button>
+            <button class="sandbox-tool-btn" id="btn-test-praxis-wave">🪐 PRAXIS SHOCKWAVE</button>
+            <button class="sandbox-tool-btn" id="btn-test-debris-shards">✨ DEBRIS SHARDS</button>
+            <button class="sandbox-tool-btn" id="btn-test-warp-streaks">⚡ WARP STREAKS</button>
+            <button class="sandbox-tool-btn" id="btn-test-grid-light">💡 DYNAMIC GRID LIGHT</button>
+          </div>
+
+          <div class="sandbox-subhdr">MOBILE HAPTICS MATRIX</div>
+          <div class="sandbox-pills">
+            <button class="sandbox-pill-sm" id="btn-hap-tap">15ms Tap</button>
+            <button class="sandbox-pill-sm" id="btn-hap-rumble">Rumble</button>
+            <button class="sandbox-pill-sm" id="btn-hap-phaser">Kick</button>
+            <button class="sandbox-pill-sm" id="btn-hap-jam">Ripple</button>
+          </div>
+        </div>
+
+        <!-- Tab 3: 🚀 STARFLEET & ALIEN STARSHIPS (10 SHIPS) -->
+        <div class="sandbox-tab-content" id="stab-ships">
+          <div class="sandbox-subhdr" style="margin-top: 0;">SELECT STARSHIP (10 MODELS)</div>
+          <div class="sandbox-btn-grid" id="sandbox-ship-selector" style="grid-template-columns: 1fr 1fr; gap: 3px;">
+            <button class="sandbox-tool-btn ship-opt-btn active" data-ship="enterprise_d">🛸 Enterprise-D</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="voyager">🚀 USS Voyager</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="defiant">🛡️ USS Defiant</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="klingon_bop">🦅 Klingon BoP</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="klingon_d7">⚔️ Klingon D7</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="romulan_warbird">🦅 Rom. Warbird</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="romulan_bird_of_prey">🗡️ Romulan BoP</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="borg_cube">🟩 Borg Cube</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="borg_sphere">🟢 Borg Sphere</button>
+            <button class="sandbox-tool-btn ship-opt-btn" data-ship="cardassian_galor">🔶 Card. Galor</button>
+          </div>
+
+          <div class="sandbox-subhdr">POSITION & ORBIT PRESET</div>
+          <div class="sandbox-pills" id="sandbox-ship-pos-pills">
+            <button class="sandbox-pill-sm active" data-pos="flank">Flank</button>
+            <button class="sandbox-pill-sm" data-pos="background">Cosmic</button>
+            <button class="sandbox-pill-sm" data-pos="flyby">Flyby</button>
+            <button class="sandbox-pill-sm" data-pos="inspect">Inspect</button>
+          </div>
+
+          <div class="sandbox-btn-grid" style="margin-top: 4px;">
+            <button class="sandbox-tool-btn" id="btn-toggle-fleet-vis">👁️ TOGGLE VISIBLE</button>
+            <button class="sandbox-tool-btn" id="btn-warp-flyby">⚡ WARP FLASH</button>
+          </div>
+        </div>
+
+        <!-- Tab 3: 🌌 ENVIRONMENT & 3D SPATIAL AUDIO -->
+        <div class="sandbox-tab-content" id="stab-audio">
+          <div class="sandbox-group">
+            <div class="sandbox-lbl">STELLAR SECTOR</div>
+            <button class="sandbox-sector-btn" id="btn-sandbox-sector">
+              🌌 <span id="val-sandbox-sector">BETELGEUSE</span> ▾
+            </button>
+          </div>
+
+          <div class="sandbox-subhdr">3D SPATIAL AUDIO PAN TEST</div>
+          <div class="sandbox-pills">
+            <button class="sandbox-pill-sm" id="btn-pan-left">Left ◄</button>
+            <button class="sandbox-pill-sm" id="btn-pan-center">Center ◆</button>
+            <button class="sandbox-pill-sm" id="btn-pan-right">Right ►</button>
+          </div>
+
+          <div class="sandbox-btn-grid" style="margin-top: 6px;">
+            <button class="sandbox-tool-btn" id="btn-test-sfx-ping">🔊 WARP PING SFX</button>
+            <button class="sandbox-tool-btn" id="btn-test-shield-chime">🛡️ SHIELD CHIME</button>
+          </div>
+        </div>
+
+        <!-- Tab 4: 📊 STARFLEET DEBRIEF SIMULATOR -->
+        <div class="sandbox-tab-content" id="stab-debrief">
+          <div class="sandbox-subhdr">SIMULATE DEBRIEF GRADE</div>
+          <div class="sandbox-pills">
+            <button class="sandbox-pill-sm" id="btn-sim-grade-s" style="color: #ffcc00;">S-Rank</button>
+            <button class="sandbox-pill-sm" id="btn-sim-grade-a" style="color: #00f0ff;">A-Rank</button>
+            <button class="sandbox-pill-sm" id="btn-sim-grade-b" style="color: var(--voyager-amber);">B-Rank</button>
+            <button class="sandbox-pill-sm" id="btn-sim-grade-c" style="color: #ff4444;">C-Rank</button>
+          </div>
+
+          <div class="sandbox-btn-grid" style="margin-top: 6px;">
+            <button class="sandbox-tool-btn" id="btn-toggle-normal-play" style="grid-column: span 2; background: #0e2a22; border-color: #33ff88; color: #33ff88;">🎮 TOGGLE NORMAL PLAY</button>
+            <button class="sandbox-tool-btn" id="btn-test-err-review">🧠 SIMULATE ERRORS</button>
+            <button class="sandbox-tool-btn" id="btn-test-clear-flight">🗑️ RESET FLIGHT</button>
+            <button class="sandbox-tool-btn" id="btn-test-starchart" style="grid-column: span 2; background: #1a2c4e; border-color: var(--voyager-peach); color: #fff;">🌌 PREVIEW GALAXY STAR CHART</button>
+          </div>
+        </div>
+
+        <!-- Tab 5: 🎥 HOLODECK FLIGHT RECORDER (MP4 / 75 FPS) -->
+        <div class="sandbox-tab-content" id="stab-recorder">
+          <!-- Main Record Action Button -->
+          <button class="sandbox-record-btn" id="btn-toggle-recording">
+            <span class="rec-dot" id="rec-status-dot">⏺️</span>
+            <span id="rec-btn-label">START 75 FPS RECORDING</span>
+          </button>
+
+          <!-- Live Recording Status & Telemetry HUD Card -->
+          <div class="rec-telemetry-card" id="rec-telemetry-card">
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">STATUS:</span>
+              <span class="rec-stat-val" id="rec-val-status">READY // STANDBY</span>
+            </div>
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">CAPTURE SOURCE:</span>
+              <span class="rec-stat-val cyan" id="rec-val-source">3D ENGINE (CANVAS STREAM)</span>
+            </div>
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">DURATION:</span>
+              <span class="rec-stat-val timer" id="rec-val-duration">00:00.0</span>
+            </div>
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">RESOLUTION:</span>
+              <span class="rec-stat-val cyan" id="rec-val-resolution">1920x1080 [Landscape]</span>
+            </div>
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">FPS & REFRESH:</span>
+              <span class="rec-stat-val gold" id="rec-val-fps">75 FPS [75Hz Display Synced]</span>
+            </div>
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">VIDEO CODEC:</span>
+              <span class="rec-stat-val purple" id="rec-val-codec">H.264 (video/mp4; codecs=avc1)</span>
+            </div>
+            <div class="rec-stat-row">
+              <span class="rec-stat-lbl">AUDIO ENGINE:</span>
+              <span class="rec-stat-val green" id="rec-val-audio">WEB AUDIO STEREO MIX [ON]</span>
+            </div>
+          </div>
+
+          <!-- Capture Source Presets -->
+          <div class="sandbox-subhdr">CAPTURE SOURCE</div>
+          <div class="sandbox-pills" id="rec-source-pills">
+            <button class="sandbox-pill-sm active" data-source="canvas">🎮 3D Engine (Canvas)</button>
+            <button class="sandbox-pill-sm" data-source="tab">🖥️ Full LCARS UI (Tab)</button>
+          </div>
+
+          <!-- FPS Presets -->
+          <div class="sandbox-subhdr">CAPTURE FRAME RATE</div>
+          <div class="sandbox-pills" id="rec-fps-pills">
+            <button class="sandbox-pill-sm" data-fps="60">60 FPS</button>
+            <button class="sandbox-pill-sm active" data-fps="75">75 FPS</button>
+            <button class="sandbox-pill-sm" data-fps="120">120 FPS</button>
+            <button class="sandbox-pill-sm" data-fps="auto">Auto Hz</button>
+          </div>
+
+          <!-- Codec Presets -->
+          <div class="sandbox-subhdr">VIDEO FORMAT (MP4)</div>
+          <div class="sandbox-pills" id="rec-codec-pills">
+            <button class="sandbox-pill-sm active" data-codec="h264">H.264 (Universal MP4)</button>
+            <button class="sandbox-pill-sm" data-codec="h264_high">H.264 (High Profile MP4)</button>
+          </div>
+
+          <!-- Bitrate Presets -->
+          <div class="sandbox-subhdr">CAPTURE BITRATE</div>
+          <div class="sandbox-pills" id="rec-bitrate-pills">
+            <button class="sandbox-pill-sm" data-bitrate="8000000">8 Mbps</button>
+            <button class="sandbox-pill-sm active" data-bitrate="16000000">16 Mbps</button>
+            <button class="sandbox-pill-sm" data-bitrate="30000000">30 Mbps</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLASSIC FLAT LCARS COMBAT CONSOLE DECK -->
+      <div class="classic-lcars-console">
+        <!-- Exact Left LCARS Okudagram Multi-Segment Spine -->
+        <div class="clcars-left-spine">
+          <div class="spine-block spine-lavender">
+            <span class="spine-text">LCARS 40274</span>
+          </div>
+          <div class="spine-block spine-periwinkle-elbow">
+            <span class="spine-text">02-654598</span>
+          </div>
+          <div class="spine-block spine-coral-elbow">
+            <span class="spine-text">02-975682</span>
+          </div>
+          <div class="spine-block spine-coral">
+            <span class="spine-text">04-765486</span>
+          </div>
+          <div class="spine-block spine-amber">
+            <span class="spine-text">05-224353</span>
+          </div>
+          <div class="spine-block spine-peach">
+            <span class="spine-text">06-578565</span>
+          </div>
+        </div>
+
+        <!-- Main Combat Console Deck -->
+        <div class="clcars-main-body">
+          <!-- Top Bracket with Alphanumeric Blocks & Tactical Equation -->
+          <div class="clcars-top-rail">
+            <div class="clcars-eq-frame">
+              <div class="clcars-badge-pill" id="target-q-category"><span class="cat-full">CALCULUS MATRIX // 04-8291</span><span class="cat-short">C.M. // 04-8291</span></div>
+              <div class="clcars-eq-text" id="target-equation-text">d/dx (x² + 3x) [x=1] = ?</div>
+            </div>
+
+            <!-- Flat LCARS Fuse Countdown with Alphanumeric Segment Bars -->
+            <div class="clcars-fuse-dock">
+              <div class="clcars-fuse-header">
+                <span class="clcars-fuse-code">FLUX 019</span>
+                <span class="clcars-fuse-val" id="wave-timer-val">50.0s</span>
+              </div>
+              <div class="clcars-flat-track">
+                <div class="clcars-flat-fill" id="wave-timer-fill"></div>
+              </div>
+            </div>
+
+            <div class="clcars-right-cap" id="combat-cap-927" style="cursor: pointer;">
+              <span class="clcars-cap-num">927</span>
+            </div>
+          </div>
+
+          <!-- Bottom Ammo Rail & Tactical Abilities Dock -->
+          <div class="clcars-bottom-rail">
+            <div class="clcars-ammo-grid" id="ammo-container">
+              <div class="clcars-ammo-pill btn-peach" data-index="0" id="ammo-0">
+                <div class="clcars-pill-left">
+                  <span class="pill-hotkey">[1]</span>
+                  <span class="pill-code">408</span>
+                </div>
+                <div class="clcars-pill-right">
+                  <span class="pill-val" id="ammo-val-0">5</span>
+                </div>
+              </div>
+
+              <div class="clcars-ammo-pill btn-periwinkle" data-index="1" id="ammo-1">
+                <div class="clcars-pill-left">
+                  <span class="pill-hotkey">[2]</span>
+                  <span class="pill-code">752</span>
+                </div>
+                <div class="clcars-pill-right">
+                  <span class="pill-val" id="ammo-val-1">4</span>
+                </div>
+              </div>
+
+              <div class="clcars-ammo-pill btn-mauve" data-index="2" id="ammo-2">
+                <div class="clcars-pill-left">
+                  <span class="pill-hotkey">[3]</span>
+                  <span class="pill-code">358</span>
+                </div>
+                <div class="clcars-pill-right">
+                  <span class="pill-val" id="ammo-val-2">6</span>
+                </div>
+              </div>
+
+              <div class="clcars-ammo-pill btn-amber" data-index="3" id="ammo-3">
+                <div class="clcars-pill-left">
+                  <span class="pill-hotkey">[4]</span>
+                  <span class="pill-code">008</span>
+                </div>
+                <div class="clcars-pill-right">
+                  <span class="pill-val" id="ammo-val-3">8</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tactical Abilities Dock: Jam + Phaser Disruptor Side-by-Side -->
+            <div class="clcars-tactical-dock">
+              <button class="clcars-ribbon-btn jam-ribbon-btn" id="btn-jam">
+                <span class="ribbon-btn-hotkey">[J]</span>
+                <div class="jam-body-wrap">
+                  <span class="ribbon-btn-label">JAM</span>
+                  <span class="ribbon-btn-charge" id="jam-charge-badge">1/1</span>
+                </div>
+              </button>
+
+              <button class="clcars-phaser-strike-btn" id="btn-phaser-strike">
+                <div class="c-strike-cap">
+                  <span class="c-strike-hotkey">[P]</span>
+                  <span class="c-strike-title">PHASER</span>
+                </div>
+                <div class="c-strike-body">
+                  <span class="c-strike-action">DISRUPTOR</span>
+                  <span class="c-strike-charge" id="phaser-charge-badge">⚡ 1 CHARGE</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- High-Density Bottom Alphanumeric Ribbon (Hidden in Portrait Testbed) -->
+          <div class="clcars-footer-ribbon">
+            <div class="ribbon-group">
+              <span class="ribbon-tag">AN MAS</span>
+              <span class="ribbon-tag">GA SPA</span>
+            </div>
+            <div class="ribbon-divider"></div>
+            <div class="ribbon-group">
+              <span class="ribbon-tag">C125</span>
+              <span class="ribbon-tag">Y850</span>
+              <span class="ribbon-tag">S390</span>
+            </div>
+            <div class="ribbon-divider"></div>
+            <div class="ribbon-group">
+              <span class="ribbon-tag">LO DOR</span>
+              <span class="ribbon-tag">JO CHI</span>
+              <span class="ribbon-tag">NA MAS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- START / MISSION SELECT MODAL -->
+  <div class="modal-backdrop" id="start-modal">
+    <div class="modal-panel">
+            <div class="modal-title-row">
+        <button class="test-ricochet-btn" id="btn-test-ricochet">
+          🎯 TEST RICOCHET
+        </button>
+        <div class="modal-title">HOLODECK VELOCITY</div>
+      </div>
+      <div class="modal-subtitle">STARFLEET 3D QUANTUM TACTICAL SIMULATOR</div>
+
+      <div class="start-record-banner">
+        🏆 ALL-TIME HIGH SCORE: <span class="record-val" id="start-highscore">0000</span>
+      </div>
+
+      <div class="settings-grid">
+        <div class="setting-group">
+          <div class="setting-title">Simulation Protocol (Mode)</div>
+          <div class="opt-btns" id="mode-selector">
+            <button class="opt-btn active" data-mode="velocity">🎯 3D Ricochet Velocity</button>
+            <button class="opt-btn" data-mode="incursion">🛡️ Quantum Incursion</button>
+            <button class="opt-btn" data-mode="blitz">⚡ 60s Warp Blitz</button>
+            <button class="opt-btn" data-mode="academy">🎓 Cadet Academy</button>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <div class="setting-title">Starfleet Rank (Difficulty)</div>
+          <div class="opt-btns" id="rank-selector">
+            <button class="opt-btn data-rank" data-rank="ensign">Ensign (Times Tables, Div & Exponents)</button>
+            <button class="opt-btn" data-rank="lieutenant">Lieutenant (Roots & Logarithms)</button>
+            <button class="opt-btn" data-rank="commander">Commander (Quadratics & Trig)</button>
+            <button class="opt-btn active" data-rank="admiral">Fleet Admiral (Calculus & Integrals)</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="engage-btn" id="btn-engage">ENGAGE SIMULATION</button>
+
+      <div class="controls-hint">
+        <div>📊 <span class="highlight">Tactical Controls</span>: <span class="highlight">[1, 2, 3, 4]</span> Fire Target | <span class="highlight">[P]</span> Phaser Strike | <span class="highlight">[J]</span> Sensor Jam 5s</div>
+        <div style="margin-top: 4px;">🚀 <span class="highlight">Hotkeys</span>: <span class="highlight">[V / C]</span> Visualizer | <span class="highlight">[T]</span> Voice Persona | <span class="highlight">[F]</span> FPS Stats | <span class="highlight">[M]</span> Mute | <span class="highlight">[A]</span> Ambient</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER / SIMULATION COMPLETE DEBRIEF MODAL -->
+  <div class="modal-backdrop hidden" id="gameover-modal">
+    <div class="modal-panel debrief-panel">
+      <div class="modal-title" id="go-title" style="color: var(--lcars-gold);">SIMULATION COMPLETE</div>
+      <div class="modal-subtitle" id="go-subtitle">STARFLEET ACADEMY TACTICAL DEBRIEFING</div>
+
+      <!-- Starfleet Rank Grading Badge -->
+      <div class="debrief-grade-card" id="debrief-grade-card">
+        <div class="grade-badge-circle grade-S" id="go-grade-badge">S</div>
+        <div class="grade-info">
+          <div class="grade-title" id="go-grade-title">FLEET ADMIRAL COMMENDATION</div>
+          <div class="grade-desc" id="go-grade-desc">Tactical vectoring and quantum calculation efficiency are operating at peak Starfleet standards.</div>
+          <div class="grade-stats-row">
+            <span class="g-stat">EFFICIENCY: <b id="go-grade-eff">98%</b></span>
+            <span class="g-sep">|</span>
+            <span class="g-stat">AVG TIME: <b id="go-grade-time">2.4s</b></span>
+            <span class="g-sep">|</span>
+            <span class="g-stat">SHIELDS: <b id="go-grade-shields">100%</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Metric Grid -->
+      <div class="score-summary">
+        <div>
+          <div class="hud-label">FINAL SCORE</div>
+          <div class="hud-value gold" id="go-score">0</div>
+        </div>
+        <div>
+          <div class="hud-label">HIGH SCORE</div>
+          <div class="hud-value" style="color: #ffaa00;" id="go-highscore">0</div>
+        </div>
+        <div>
+          <div class="hud-label">WAVES CLEARED</div>
+          <div class="hud-value cyan" id="go-level">0</div>
+        </div>
+        <div>
+          <div class="hud-label">ACCURACY</div>
+          <div class="hud-value purple" id="go-accuracy">100%</div>
+        </div>
+      </div>
+
+      <!-- Career Flight Recorder Persistent Stats Banner -->
+      <div class="career-recorder-bar" id="go-flight-recorder">
+        <div class="cr-item">🚀 <span class="cr-lbl">MISSIONS:</span> <b id="cr-missions">0</b></div>
+        <div class="cr-item">💥 <span class="cr-lbl">VAPORIZED:</span> <b id="cr-vaporized">0</b></div>
+        <div class="cr-item">⚡ <span class="cr-lbl">BEST STREAK:</span> <b id="cr-streak">0</b></div>
+        <div class="cr-item">🎯 <span class="cr-lbl">CAREER ACC:</span> <b id="cr-accuracy">100%</b></div>
+      </div>
+
+      <!-- Astrometric Sector Galaxy Star Chart & Warp Flight Log -->
+      <div class="star-chart-section" id="debrief-star-chart-card">
+        <div class="sc-header">
+          <div class="sc-title-group">
+            <span class="sc-icon">🌌</span>
+            <span class="sc-title">ASTROMETRIC PATROL ROUTE & STAR CHART</span>
+          </div>
+          <span class="sc-status-pill" id="sc-flight-status">SECTOR 1 OF 10 // WARP 9.2</span>
+        </div>
+
+        <!-- Astrometric SVG Flight Corridor Map -->
+        <div class="sc-map-container" id="sc-map-container">
+          <svg class="sc-svg" id="sc-svg-map" viewBox="0 0 540 180" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <g id="sc-stars-layer"></g>
+            <g id="sc-paths-layer"></g>
+            <g id="sc-nodes-layer"></g>
+          </svg>
+        </div>
+
+        <!-- Selected Sector Telemetry Drawer -->
+        <div class="sc-sector-intel" id="sc-sector-intel">
+          <div class="sc-intel-top">
+            <span class="sc-intel-name" id="sc-intel-name">BETELGEUSE // ALPHA ORIONIS</span>
+            <span class="sc-intel-badge" id="sc-intel-badge">CURRENT STATION</span>
+          </div>
+          <div class="sc-intel-desc" id="sc-intel-desc">Red supergiant star with violent coronal plasma ejections. Deflector shields holding at standard harmonic frequency.</div>
+        </div>
+      </div>
+
+      <!-- Step-by-Step Diagnostic Error Review -->
+      <div class="diagnostic-review-section">
+        <div class="dr-header">
+          <span>🧠 LCARS DIAGNOSTIC ERROR REVIEW</span>
+          <span class="dr-count" id="dr-error-count">0 ERRORS</span>
+        </div>
+        <div class="dr-list-container" id="dr-list-container">
+          <!-- Dynamic cards injected via JS -->
+        </div>
+      </div>
+
+      <!-- Debrief Action Row with Re-Engage, Sector Map View, and Pause Telemetry Review -->
+      <div class="debrief-actions-row">
+        <button class="engage-btn" id="btn-retry">RE-ENGAGE HOLODECK</button>
+        <button class="debrief-map-btn" id="btn-debrief-sector-map">🌌 SECTOR MAP</button>
+        <button class="debrief-pause-btn" id="btn-debrief-pause-view">🛡️ PAUSE // SECTOR STATUS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENHANCED TRANSLUCENT PAUSE MODAL -->
+  <div class="modal-backdrop hidden" id="pause-modal">
+    <div class="modal-panel pause-panel">
+      <div class="pause-header-badge">🛡️ HOLODECK SAFETY PROTOCOLS: ENGAGED</div>
+      <div class="modal-title" style="color: var(--lcars-cyan); margin-bottom: 2px;">SIMULATION PAUSED</div>
+      <div class="modal-subtitle" style="margin-bottom: 12px;">TACTICAL MATRIX & TIME FLOW SUSPENDED</div>
+      
+      <div class="pause-sector-card" id="pause-sector-card">
+        <div class="p-sec-header">
+          <span class="p-sec-icon">🌌</span>
+          <span class="p-sec-title" id="pause-sec-title">STELLAR SECTOR: BETELGEUSE</span>
+        </div>
+        <div class="p-sec-class" id="pause-sec-class">CLASS-M RED SUPERGIANT // ALPHA ORIONIS</div>
+        <div class="p-sec-desc" id="pause-sec-desc">
+          Alpha Orionis Class-M Red Supergiant. Diameter ~700x Sol. Features boiling turbulent convection plasma cells, magnetic flux loops, and superheated coronal prominences.
+        </div>
+        <div class="p-sec-note" id="pause-sec-note">
+          TACTICAL TELEMETRY: Stellar radiation holding within safety tolerance.
+        </div>
+      </div>
+
+      <div class="pause-btn-row">
+        <button class="engage-btn" id="btn-resume">RESUME SIMULATION [ESC / P]</button>
+        <button class="pause-map-btn" id="btn-pause-sector-map">🌌 SECTOR MAP VIEW</button>
+        <div class="pause-btn-stack">
+          <button class="pause-sound-btn" id="btn-pause-sound-toggle">🔊 SOUND: ON</button>
+          <button class="pause-end-btn" id="btn-quit">END MISSION</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM MISSION ABORT CONFIRMATION MODAL -->
+  <div class="modal-backdrop hidden" id="confirm-abort-modal" style="z-index: 1050;">
+    <div class="modal-panel confirm-abort-panel">
+      <div class="confirm-abort-badge">⚠️ STARFLEET COMMAND OVERRIDE</div>
+      <div class="modal-title" style="color: #ff3333; margin-bottom: 4px;">ABORT MISSION?</div>
+      <div class="modal-subtitle" style="margin-bottom: 14px;">TACTICAL SIMULATION TERMINATION CONFIRMATION</div>
+      
+      <div class="confirm-abort-card">
+        <p style="margin: 0 0 10px 0; color: #e0e6ed; font-size: 0.92rem; line-height: 1.45;">
+          Are you sure you want to end your current mission?
+        </p>
+        <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.76rem; color: #ff8888; border-left: 3px solid #ff3333; padding-left: 10px;">
+          NOTICE: Current sector wave and streak telemetry will be finalized to the Starfleet Flight Recorder.
+        </div>
+      </div>
+
+      <div class="confirm-abort-actions">
+        <button class="confirm-abort-cancel-btn" id="btn-abort-cancel">↩️ RETURN TO SIMULATION</button>
+        <button class="confirm-abort-confirm-btn" id="btn-abort-confirm">💥 CONFIRM ABORT // END MISSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASTROMETRIC SECTOR GALAXY MAP MODAL -->
+  <div class="modal-backdrop hidden" id="sector-map-modal" style="z-index: 1040;">
+    <div class="modal-panel sector-map-panel">
+      <div class="pause-header-badge">🌌 ASTROMETRICS CARTOGRAPHY DIVISION</div>
+      <div class="modal-title" style="color: var(--lcars-cyan); margin-bottom: 2px;">GALAXY STAR CHART</div>
+      <div class="modal-subtitle" style="margin-bottom: 12px;">STELLAR SECTORS // PATROL FLIGHT CORRIDOR</div>
+      
+      <!-- Interactive SVG Star Chart Container -->
+      <div class="star-chart-section" id="modal-star-chart-card" style="margin-bottom: 14px;">
+        <div class="sc-header">
+          <div class="sc-title-group">
+            <span class="sc-icon">🌌</span>
+            <span class="sc-title">ASTROMETRIC PATROL ROUTE & STAR CHART</span>
+          </div>
+          <span class="sc-status-pill" id="sc-modal-flight-status">SECTOR 1 OF 10 // WARP 9.2</span>
+        </div>
+
+        <div class="sc-map-container">
+          <svg class="sc-svg" id="sc-modal-svg-map" viewBox="0 0 540 180" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="glow-gold-m" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-cyan-m" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <g id="sc-modal-stars-layer"></g>
+            <g id="sc-modal-paths-layer"></g>
+            <g id="sc-modal-nodes-layer"></g>
+          </svg>
+        </div>
+
+        <div class="sc-sector-intel" id="sc-modal-sector-intel">
+          <div class="sc-intel-top">
+            <span class="sc-intel-name" id="sc-modal-intel-name">BETELGEUSE // ALPHA ORIONIS</span>
+            <span class="sc-intel-badge" id="sc-modal-intel-badge">CURRENT STATION</span>
+          </div>
+          <div class="sc-intel-desc" id="sc-modal-intel-desc">Red supergiant star with violent coronal plasma ejections. Deflector shields holding at standard harmonic frequency.</div>
+        </div>
+      </div>
+
+      <div class="pause-btn-row" style="justify-content: center;">
+        <button class="engage-btn" id="btn-close-sector-map" style="max-width: 380px;">↩️ RETURN TO PAUSE SCREEN</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECORDED VIDEO PLAYBACK PREVIEW MODAL -->
+  <div class="modal-backdrop hidden" id="recorder-preview-modal">
+    <div class="modal-panel rec-preview-panel">
+      <div class="modal-title" style="color: var(--voyager-peach);">🎥 RECORDING COMPLETE</div>
+      <div class="modal-subtitle" id="rec-preview-subtitle">75 FPS MP4 VIDEO READY</div>
+      
+      <div class="rec-video-container">
+        <video id="rec-preview-video" controls autoplay playsinline loop></video>
+      </div>
+
+      <div class="rec-clip-meta" id="rec-clip-meta">
+        <span>RESOLUTION: <b id="rec-meta-res">1920x1080</b></span>
+        <span>FPS: <b id="rec-meta-fps">75 FPS</b></span>
+        <span>CODEC: <b id="rec-meta-codec">H.264 (MP4)</b></span>
+        <span>SIZE: <b id="rec-meta-size">2.4 MB</b></span>
+      </div>
+
+      <div class="debrief-actions-row">
+        <button class="engage-btn" id="btn-rec-download">💾 SAVE VIDEO</button>
+        <button class="debrief-map-btn" id="btn-rec-close">✕ CLOSE PREVIEW</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING LCARS HOLOGRAPHIC TOOLTIP -->
+  <div id="lcars-tooltip" class="lcars-tooltip">
+    <div class="tt-header" id="tt-title">SECTOR TELEMETRY</div>
+    <div class="tt-class" id="tt-class">CLASS-M RED SUPERGIANT</div>
+    <div class="tt-body" id="tt-body">Sector description and tactical analysis.</div>
+    <div class="tt-note" id="tt-note">TACTICAL INTEL // STARFLEET ARCHIVES</div>
+  </div>
+
+  <!-- Modular Scripts -->
+  <script src="audio.js?v=3.2.0"></script>
+  <script src="math.js?v=3.2.0"></script>
+  <script src="game.js?v=3.2.0"></script>
+  <script>
+    // Ensure Desktop WebView2 & Browser always load fresh binary assets and purge old stale SW caches
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        for (let r of regs) r.unregister();
+      }).catch(() => {});
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        for (let k of keys) caches.delete(k);
+      }).catch(() => {});
+    }
+  </script>
+</body>
+</html>

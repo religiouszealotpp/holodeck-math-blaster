@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Tauri Build Artifacts
+src-tauri/target/
+
+# Local Checkpoints & Large Archives
+checkpoints/
+releases/
+*.log
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment / Secrets
+.env
+.env.local
+*.pem
