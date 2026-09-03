@@ -187,7 +187,11 @@ class HolodeckGame {
       bannerContainer: document.getElementById('banner-container'),
       activeBanner: document.getElementById('active-banner'),
       viewport: document.getElementById('holodeck-viewport'),
-      crosshair: document.getElementById('reticle-crosshair')
+      crosshair: document.getElementById('reticle-crosshair'),
+      ttTitle: document.getElementById('tt-title'),
+      ttClass: document.getElementById('tt-class'),
+      ttBody: document.getElementById('tt-body'),
+      ttNote: document.getElementById('tt-note')
     };
   }
 
@@ -218,7 +222,7 @@ class HolodeckGame {
       }
     }
     if (obj.geometry && typeof obj.geometry.dispose === 'function') {
-      obj.geometry.dispose();
+      if (!obj.geometry.isShared) obj.geometry.dispose();
     }
     if (obj.material) {
       if (Array.isArray(obj.material)) {
@@ -231,10 +235,19 @@ class HolodeckGame {
 
   disposeMaterial(mat) {
     if (!mat) return;
-    if (mat.map && typeof mat.map.dispose === 'function') mat.map.dispose();
-    if (mat.emissiveMap && typeof mat.emissiveMap.dispose === 'function') mat.emissiveMap.dispose();
-    if (mat.specularMap && typeof mat.specularMap.dispose === 'function') mat.specularMap.dispose();
-    if (mat.roughnessMap && typeof mat.roughnessMap.dispose === 'function') mat.roughnessMap.dispose();
+    if (mat.isShared) return;
+    if (mat.map && typeof mat.map.dispose === 'function') {
+      if (!mat.map.isPersistent) mat.map.dispose();
+    }
+    if (mat.emissiveMap && typeof mat.emissiveMap.dispose === 'function') {
+      if (!mat.emissiveMap.isPersistent) mat.emissiveMap.dispose();
+    }
+    if (mat.specularMap && typeof mat.specularMap.dispose === 'function') {
+      if (!mat.specularMap.isPersistent) mat.specularMap.dispose();
+    }
+    if (mat.roughnessMap && typeof mat.roughnessMap.dispose === 'function') {
+      if (!mat.roughnessMap.isPersistent) mat.roughnessMap.dispose();
+    }
     if (typeof mat.dispose === 'function') mat.dispose();
   }
 
@@ -276,11 +289,22 @@ class HolodeckGame {
 
     // High-Performance Shared Geometries & Material Cache (Zero allocations during bounces)
     this.sharedPlaneGeo = (typeof THREE.PlaneGeometry === 'function') ? new THREE.PlaneGeometry(1.0, 1.0) : null;
+    if (this.sharedPlaneGeo) this.sharedPlaneGeo.isShared = true;
     this.sharedDiamondGeo = (typeof THREE.PlaneGeometry === 'function') ? new THREE.PlaneGeometry(0.32, 0.32) : null;
+    if (this.sharedDiamondGeo) this.sharedDiamondGeo.isShared = true;
     this.sharedSparkGeo = (typeof THREE.SphereGeometry === 'function') ? new THREE.SphereGeometry(0.12, 6, 6) : null;
+    if (this.sharedSparkGeo) this.sharedSparkGeo.isShared = true;
     this.sharedShardGeo = (typeof THREE.TetrahedronGeometry === 'function') ? new THREE.TetrahedronGeometry(0.38, 0) : (this.sharedDiamondGeo || new THREE.BoxGeometry(0.35, 0.35, 0.35));
+    if (this.sharedShardGeo) this.sharedShardGeo.isShared = true;
     this.sharedVertexGeo = (typeof THREE.SphereGeometry === 'function') ? new THREE.SphereGeometry(0.24, 8, 8) : null;
+    if (this.sharedVertexGeo) this.sharedVertexGeo.isShared = true;
     this.sharedCoronaGeo = (typeof THREE.SphereGeometry === 'function') ? new THREE.SphereGeometry(0.48, 8, 8) : null;
+    if (this.sharedCoronaGeo) this.sharedCoronaGeo.isShared = true;
+    this.sharedTargetBoxGeo = (typeof THREE.BoxGeometry === 'function') ? new THREE.BoxGeometry(4.4, 2.9, 0.75) : null;
+    if (this.sharedTargetBoxGeo) this.sharedTargetBoxGeo.isShared = true;
+    this.sharedPraxisRingGeo = (typeof THREE.RingGeometry === 'function') ? new THREE.RingGeometry(0.8, 2.2, 48) : null;
+    if (this.sharedPraxisRingGeo) this.sharedPraxisRingGeo.isShared = true;
+
     this.sharedWhiteAdditiveMat = (typeof THREE.MeshBasicMaterial === 'function') ? new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -288,7 +312,11 @@ class HolodeckGame {
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending
     }) : null;
+    if (this.sharedWhiteAdditiveMat) this.sharedWhiteAdditiveMat.isShared = true;
     this.pulseMatCache = new Map();
+
+    this.initNumeralGeos();
+    this.initTargetCanvasPool();
 
     // High-Performance Reusable PointLight Pool (Pre-attached to scene to prevent dynamic shader recompilation)
     this.impactLightPool = [];
@@ -334,7 +362,88 @@ class HolodeckGame {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
       this.adjustRightDockLayout();
+      this.checkTargetCanvasPoolResolution();
     });
+  }
+
+  getTargetResolutionTier() {
+    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const screenW = typeof window !== 'undefined' ? (window.screen ? window.screen.width : window.innerWidth) : 1920;
+    const screenH = typeof window !== 'undefined' ? (window.screen ? window.screen.height : window.innerHeight) : 1080;
+    const physicalW = screenW * dpr;
+    const physicalH = screenH * dpr;
+    const isMobile = (typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent))
+                  || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+
+    if (isMobile) {
+      return { width: 512, height: 320, tier: 'MOBILE_LEAN' };
+    } else if (physicalW >= 3440 || (physicalW >= 2560 && physicalH >= 1440 && dpr >= 1.5)) {
+      return { width: 1024, height: 640, tier: '4K_ULTRA_CRISP' };
+    } else {
+      return { width: 768, height: 480, tier: 'DESKTOP_BALANCED' };
+    }
+  }
+
+  initTargetCanvasPool() {
+    if (this.targetCanvasPool && this.targetCanvasPool.length === 4) return;
+    const res = this.getTargetResolutionTier();
+    this.currentCanvasTier = res.tier;
+    this.targetCanvasPool = [];
+    this.targetTexturePool = [];
+
+    for (let i = 0; i < 4; i++) {
+      const c = document.createElement('canvas');
+      c.width = res.width;
+      c.height = res.height;
+      const tex = (typeof THREE.CanvasTexture === 'function') ? new THREE.CanvasTexture(c) : null;
+      if (tex) {
+        tex.isPersistent = true;
+        tex.generateMipmaps = true;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        if (this.renderer && this.renderer.capabilities) {
+          tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        }
+      }
+      this.targetCanvasPool.push(c);
+      this.targetTexturePool.push(tex);
+    }
+  }
+
+  checkTargetCanvasPoolResolution() {
+    const res = this.getTargetResolutionTier();
+    if (res.tier !== this.currentCanvasTier && this.targetCanvasPool) {
+      this.currentCanvasTier = res.tier;
+      this.targetCanvasPool.forEach((c, idx) => {
+        c.width = res.width;
+        c.height = res.height;
+        if (this.targetTexturePool && this.targetTexturePool[idx]) {
+          this.targetTexturePool[idx].needsUpdate = true;
+        }
+      });
+    }
+  }
+
+  initNumeralGeos() {
+    if (this.numeralGeos) return;
+    if (typeof THREE.BoxGeometry !== 'function') return;
+
+    this.numeralGeos = {
+      H_SEG: new THREE.BoxGeometry(0.58, 0.15, 0.06),
+      V_SEG: new THREE.BoxGeometry(0.15, 0.50, 0.06),
+      D_SEG: new THREE.BoxGeometry(0.15, 0.15, 0.06),
+      MINUS_SEG: new THREE.BoxGeometry(0.46, 0.15, 0.06),
+      SIX_UNDERLINE: new THREE.BoxGeometry(0.72, 0.09, 0.05)
+    };
+
+    this.numeralEdgeGeos = {};
+    for (const [key, geo] of Object.entries(this.numeralGeos)) {
+      geo.isShared = true;
+      if (typeof THREE.EdgesGeometry === 'function') {
+        const edgeGeo = new THREE.EdgesGeometry(geo);
+        edgeGeo.isShared = true;
+        this.numeralEdgeGeos[key] = edgeGeo;
+      }
+    }
   }
 
   getPulseMaterial(colorHex) {
@@ -2808,12 +2917,13 @@ class HolodeckGame {
     if (!str) return root;
     const chars = str.split('');
 
-    // LCARS Beveled 3D Segment Geometries
-    const H_SEG = new THREE.BoxGeometry(0.58, 0.15, 0.06);
-    const V_SEG = new THREE.BoxGeometry(0.15, 0.50, 0.06);
-    const D_SEG = new THREE.BoxGeometry(0.15, 0.15, 0.06);
-    const MINUS_SEG = new THREE.BoxGeometry(0.46, 0.15, 0.06);
-    const SIX_UNDERLINE = new THREE.BoxGeometry(0.72, 0.09, 0.05);
+    this.initNumeralGeos();
+
+    const H_SEG = (this.numeralGeos && this.numeralGeos.H_SEG) || new THREE.BoxGeometry(0.58, 0.15, 0.06);
+    const V_SEG = (this.numeralGeos && this.numeralGeos.V_SEG) || new THREE.BoxGeometry(0.15, 0.50, 0.06);
+    const D_SEG = (this.numeralGeos && this.numeralGeos.D_SEG) || new THREE.BoxGeometry(0.15, 0.15, 0.06);
+    const MINUS_SEG = (this.numeralGeos && this.numeralGeos.MINUS_SEG) || new THREE.BoxGeometry(0.46, 0.15, 0.06);
+    const SIX_UNDERLINE = (this.numeralGeos && this.numeralGeos.SIX_UNDERLINE) || new THREE.BoxGeometry(0.72, 0.09, 0.05);
 
     const safeHl = typeof textHlMult === 'number' ? textHlMult : 1.0;
     const safeGlow = typeof glowMult === 'number' ? glowMult : 1.0;
@@ -2831,15 +2941,15 @@ class HolodeckGame {
       : new THREE.MeshBasicMaterial({ color: colorHex });
 
     const segPositions = {
-      a: { geo: H_SEG, pos: [0, 0.52, 0] },
-      b: { geo: V_SEG, pos: [0.28, 0.25, 0] },
-      c: { geo: V_SEG, pos: [0.28, -0.25, 0] },
-      d: { geo: H_SEG, pos: [0, -0.52, 0] },
-      e: { geo: V_SEG, pos: [-0.28, -0.25, 0] },
-      f: { geo: V_SEG, pos: [-0.28, 0.25, 0] },
-      g: { geo: H_SEG, pos: [0, 0, 0] },
-      minus: { geo: MINUS_SEG, pos: [0, 0, 0] },
-      dot: { geo: D_SEG, pos: [0, -0.52, 0] }
+      a: { geo: H_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.H_SEG, pos: [0, 0.52, 0] },
+      b: { geo: V_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.V_SEG, pos: [0.28, 0.25, 0] },
+      c: { geo: V_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.V_SEG, pos: [0.28, -0.25, 0] },
+      d: { geo: H_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.H_SEG, pos: [0, -0.52, 0] },
+      e: { geo: V_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.V_SEG, pos: [-0.28, -0.25, 0] },
+      f: { geo: V_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.V_SEG, pos: [-0.28, 0.25, 0] },
+      g: { geo: H_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.H_SEG, pos: [0, 0, 0] },
+      minus: { geo: MINUS_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.MINUS_SEG, pos: [0, 0, 0] },
+      dot: { geo: D_SEG, edgeGeo: this.numeralEdgeGeos && this.numeralEdgeGeos.D_SEG, pos: [0, -0.52, 0] }
     };
 
     const digitMap = {
@@ -2873,7 +2983,10 @@ class HolodeckGame {
         const mesh = new THREE.Mesh(s.geo, whiteMat);
         mesh.position.set(s.pos[0], s.pos[1], s.pos[2]);
 
-        if (typeof THREE.EdgesGeometry === 'function' && typeof THREE.LineSegments === 'function') {
+        if (typeof THREE.LineSegments === 'function' && s.edgeGeo) {
+          const edges = new THREE.LineSegments(s.edgeGeo, edgeMat);
+          mesh.add(edges);
+        } else if (typeof THREE.EdgesGeometry === 'function' && typeof THREE.LineSegments === 'function') {
           const edges = new THREE.LineSegments(new THREE.EdgesGeometry(s.geo), edgeMat);
           mesh.add(edges);
         }
@@ -2883,7 +2996,11 @@ class HolodeckGame {
       if (ch === '6' && str.trim() === '6') {
         const ulMesh = new THREE.Mesh(SIX_UNDERLINE, whiteMat);
         ulMesh.position.set(0, -0.76, 0);
-        if (typeof THREE.EdgesGeometry === 'function' && typeof THREE.LineSegments === 'function') {
+        const ulEdgeGeo = this.numeralEdgeGeos && this.numeralEdgeGeos.SIX_UNDERLINE;
+        if (typeof THREE.LineSegments === 'function' && ulEdgeGeo) {
+          const ulEdges = new THREE.LineSegments(ulEdgeGeo, edgeMat);
+          ulMesh.add(ulEdges);
+        } else if (typeof THREE.EdgesGeometry === 'function' && typeof THREE.LineSegments === 'function') {
           const ulEdges = new THREE.LineSegments(new THREE.EdgesGeometry(SIX_UNDERLINE), edgeMat);
           ulMesh.add(ulEdges);
         }
@@ -2907,12 +3024,20 @@ class HolodeckGame {
   }
 
   createTargetTexture(text, isCharging = false, targetId = '01', choiceIndex = 0) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 640;
-    const ctx = canvas.getContext('2d');
-
     const numIdx = typeof choiceIndex === 'number' ? (choiceIndex % 4) : 0;
+    if (!this.targetCanvasPool || this.targetCanvasPool.length < 4) {
+      this.initTargetCanvasPool();
+    }
+
+    const canvas = (this.targetCanvasPool && this.targetCanvasPool[numIdx]) || document.createElement('canvas');
+    if (!canvas.width) { canvas.width = 1024; canvas.height = 640; }
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (ctx.save) ctx.save();
+    // Normalize rendering coordinate space to 1024x640 design baseline
+    if (ctx.scale) ctx.scale(canvas.width / 1024, canvas.height / 640);
+
     const glowMult = typeof this.testGlowMult === 'number' ? this.testGlowMult : 1.0;
 
     const lightedBoxPalettes = [
@@ -2992,9 +3117,14 @@ class HolodeckGame {
     ctx.fillStyle = pal.base;
     ctx.fillRect(44, 590, 936, 6);
 
-    if (ctx.restore) ctx.restore();
+    if (ctx.restore) {
+      ctx.restore(); // restore shadow
+      ctx.restore(); // restore scale
+    }
 
-    const texture = new THREE.CanvasTexture(canvas);
+    const texture = (this.targetTexturePool && this.targetTexturePool[numIdx]) || new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    texture.isPersistent = true;
     texture.generateMipmaps = true;
     texture.minFilter = THREE.LinearMipmapLinearFilter;
     if (this.renderer && this.renderer.capabilities) {
@@ -3040,7 +3170,7 @@ class HolodeckGame {
 
         const curGlowMult = typeof this.testGlowMult === 'number' ? this.testGlowMult : 1.0;
         const textHlMult = typeof this.testTextHighlightMult === 'number' ? this.testTextHighlightMult : 1.0;
-        const geo = new THREE.BoxGeometry(4.4, 2.9, 0.75);
+        const geo = this.sharedTargetBoxGeo || new THREE.BoxGeometry(4.4, 2.9, 0.75);
         const tex = this.createTargetTexture('', false, `0${i + 1}`, colorIdx);
         const mat = new THREE.MeshStandardMaterial({
           map: tex,
@@ -3128,7 +3258,7 @@ class HolodeckGame {
 
       const curGlowMult = typeof this.testGlowMult === 'number' ? this.testGlowMult : 1.0;
       const textHlMult = typeof this.testTextHighlightMult === 'number' ? this.testTextHighlightMult : 1.0;
-      const geo = new THREE.BoxGeometry(4.4, 2.9, 0.75);
+      const geo = this.sharedTargetBoxGeo || new THREE.BoxGeometry(4.4, 2.9, 0.75);
       const tex = this.createTargetTexture('', false, `0${i + 1}`, colorIdx);
       const mat = new THREE.MeshStandardMaterial({
         map: tex,
@@ -3720,13 +3850,7 @@ class HolodeckGame {
         opacity: 0.95
       });
 
-      const flash = new THREE.PointLight(0xff3333, 5, 25);
-      flash.position.copy(position);
-      this.scene.add(flash);
-      setTimeout(() => {
-        this.scene.remove(flash);
-        this.disposeObject(flash);
-      }, 160);
+      this.triggerGridPointLight(position, 0xff3333, 5.0, 0.08);
 
       if (DEBUG_LOGS) {
         console.log(`[LCARS Explosion FX] Incorrect Target -> Classic Red Explosion (75 particles)`);
@@ -3824,22 +3948,7 @@ class HolodeckGame {
 
     // Radiant Dynamic PointLight illuminating holodeck walls & room in the exact answer color
     const flashIntensity = 5.5 + Math.min(4.0, count / 75.0);
-    const flash = new THREE.PointLight(primaryColor, flashIntensity, 38.0, 1.4);
-    flash.position.copy(position);
-    this.scene.add(flash);
-
-    // Smooth light decay over 240ms
-    let lightLife = 1.0;
-    const lightInterval = setInterval(() => {
-      lightLife -= 0.15;
-      if (lightLife <= 0) {
-        clearInterval(lightInterval);
-        this.scene.remove(flash);
-        this.disposeObject(flash);
-      } else {
-        flash.intensity = flashIntensity * lightLife;
-      }
-    }, 30);
+    this.triggerGridPointLight(position, primaryColor, flashIntensity, 0.055);
 
     if (DEBUG_LOGS) {
       console.log(`[LCARS Explosion FX] Correct Answer Color: 0x${primaryColor.toString(16)} | Particles: ${count} | Light Intensity: ${flashIntensity.toFixed(1)}`);
@@ -3926,7 +4035,7 @@ class HolodeckGame {
   spawnPraxisShockwave(pos, colorHex = 0x00f0ff) {
     if (!this.scene) return;
     try {
-      const ringGeo = (typeof THREE.RingGeometry === 'function') ? new THREE.RingGeometry(0.8, 2.2, 48) : null;
+      const ringGeo = this.sharedPraxisRingGeo || ((typeof THREE.RingGeometry === 'function') ? new THREE.RingGeometry(0.8, 2.2, 48) : null);
       const ringMat = (typeof THREE.MeshBasicMaterial === 'function') ? new THREE.MeshBasicMaterial({
         color: colorHex,
         side: THREE.DoubleSide,
@@ -3962,15 +4071,16 @@ class HolodeckGame {
       const shardGeo = this.sharedShardGeo || (typeof THREE.TetrahedronGeometry === 'function' ? new THREE.TetrahedronGeometry(0.38, 0) : null);
       if (!shardGeo) return;
 
+      const sharedMat = (typeof THREE.MeshBasicMaterial === 'function') ? new THREE.MeshBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      }) : null;
+
       for (let i = 0; i < count; i++) {
-        const mat = new THREE.MeshBasicMaterial({
-          color: colorHex,
-          transparent: true,
-          opacity: 0.95,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        });
-        const mesh = new THREE.Mesh(shardGeo, mat);
+        const mesh = new THREE.Mesh(shardGeo, sharedMat);
         mesh.position.copy(pos);
         this.scene.add(mesh);
 
@@ -3978,6 +4088,7 @@ class HolodeckGame {
         const speed = 2.2 + Math.random() * 7.5;
         this.debrisShards.push({
           mesh,
+          sharedMat,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           vz: (Math.random() - 0.5) * 5.5,
@@ -6232,8 +6343,7 @@ class HolodeckGame {
     let hoveredTarget = null;
 
     window.addEventListener('pointermove', (e) => {
-      crosshair.style.left = `${e.clientX}px`;
-      crosshair.style.top = `${e.clientY}px`;
+      crosshair.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
 
       this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -6260,10 +6370,10 @@ class HolodeckGame {
               }
 
               if (tooltip) {
-                const titleEl = document.getElementById('tt-title');
-                const classEl = document.getElementById('tt-class');
-                const bodyEl = document.getElementById('tt-body');
-                const noteEl = document.getElementById('tt-note');
+                const titleEl = (this.dom && this.dom.ttTitle) || document.getElementById('tt-title');
+                const classEl = (this.dom && this.dom.ttClass) || document.getElementById('tt-class');
+                const bodyEl = (this.dom && this.dom.ttBody) || document.getElementById('tt-body');
+                const noteEl = (this.dom && this.dom.ttNote) || document.getElementById('tt-note');
                 if (titleEl) titleEl.innerText = `🎯 TARGET #${target.index || 1} // VALUE: "${target.value}"`;
                 if (classEl) classEl.innerText = `STATUS: FROZEN IN TACTICAL STASIS`;
                 if (bodyEl) bodyEl.innerText = `Sector Pos: [X: ${target.mesh.position.x.toFixed(1)}, Y: ${target.mesh.position.y.toFixed(1)}, Z: ${target.mesh.position.z.toFixed(1)}] | Velocity: [${Math.hypot(target.vx, target.vy, target.vz).toFixed(2)}u/s] | Spin: [${(target.rotY * 180 / Math.PI).toFixed(1)}°/f]`;

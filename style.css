@@ -55,6 +55,7 @@ body, html {
 
 .shake-screen {
   animation: screenShakeAnim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  will-change: transform;
 }
 
 @keyframes screenShakeAnim {
@@ -392,13 +393,13 @@ body, html {
   box-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
 }
 
-.vis-btn-pill.hidden-mode {
+.vis-btn-pill.hidden-mode, .vis-toggle-ans-btn.hidden-mode {
   background: #200810;
   border-color: #ff3355;
   color: #ff88aa;
 }
 
-.vis-btn-pill.hidden-mode:hover {
+.vis-btn-pill.hidden-mode:hover, .vis-toggle-ans-btn.hidden-mode:hover {
   background: #ff3355;
   color: #000000;
   box-shadow: 0 0 8px rgba(255, 51, 85, 0.6);
@@ -1246,13 +1247,15 @@ body, html {
 
 #crosshair {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 0;
+  left: 0;
+  margin: 0;
   transform: translate(-50%, -50%);
   width: 42px;
   height: 42px;
   pointer-events: none;
   z-index: 5;
+  will-change: transform;
 }
 
 #crosshair::before, #crosshair::after {

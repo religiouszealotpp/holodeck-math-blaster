@@ -46,17 +46,38 @@ class HolodeckAudio {
     return this.mediaStreamDest ? this.mediaStreamDest.stream : null;
   }
 
+  initPannerPool() {
+    if (!this.ctx || typeof this.ctx.createStereoPanner !== 'function') return;
+    if (this.pannerPool && this.pannerPool.length > 0) return;
+    this.pannerPool = [];
+    this.pannerPoolIndex = 0;
+    const master = this.masterGain || this.ctx.destination;
+    for (let i = 0; i < 8; i++) {
+      try {
+        const p = this.ctx.createStereoPanner();
+        p.pan.setValueAtTime(0, this.ctx.currentTime);
+        p.connect(master);
+        this.pannerPool.push(p);
+      } catch(e) {}
+    }
+  }
+
   getMasterNode(panX = null) {
     if (!this.ctx) return null;
     const master = this.masterGain || this.ctx.destination;
     if (typeof panX === 'number' && typeof this.ctx.createStereoPanner === 'function') {
-      try {
-        const panVal = Math.max(-0.85, Math.min(0.85, panX / 21.0));
-        const panner = this.ctx.createStereoPanner();
-        panner.pan.setValueAtTime(panVal, this.ctx.currentTime);
-        panner.connect(master);
-        return panner;
-      } catch(e) {}
+      if (!this.pannerPool || this.pannerPool.length === 0) {
+        this.initPannerPool();
+      }
+      if (this.pannerPool && this.pannerPool.length > 0) {
+        try {
+          const panVal = Math.max(-0.85, Math.min(0.85, panX / 21.0));
+          const panner = this.pannerPool[this.pannerPoolIndex];
+          this.pannerPoolIndex = (this.pannerPoolIndex + 1) % this.pannerPool.length;
+          panner.pan.setValueAtTime(panVal, this.ctx.currentTime);
+          return panner;
+        } catch(e) {}
+      }
     }
     return master;
   }
@@ -175,6 +196,7 @@ class HolodeckAudio {
         if (this.mediaStreamDest) {
           try { this.masterGain.connect(this.mediaStreamDest); } catch(e) {}
         }
+        this.initPannerPool();
       }
       if (this.ctx && this.ctx.state === 'suspended') {
         this.ctx.resume();
