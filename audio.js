@@ -124,7 +124,11 @@ class HolodeckAudio {
           }
 
           // 3. Captain Benjamin Sisko (Deep, commanding US baritone)
-          const siskoPreferred = ['Microsoft David', 'Microsoft Guy', 'Google US English Male', 'Alex', 'Fred', 'en-US'];
+          const siskoPreferred = [
+            'Microsoft Steffan Online (Natural)', 'Microsoft Christopher Online (Natural)',
+            'Microsoft Ryan Online (Natural)', 'Microsoft Steffan', 'Microsoft Guy',
+            'Microsoft David', 'Google US English Male', 'Alex', 'Fred', 'en-US'
+          ];
           for (const pref of siskoPreferred) {
             const match = voices.find(v => (v.name && v.name.toLowerCase().includes(pref.toLowerCase())) || (v.lang && v.lang.toLowerCase().includes(pref.toLowerCase())));
             if (match) {
@@ -150,7 +154,10 @@ class HolodeckAudio {
           }
 
           // 5. The EMH Hologram Doctor (Theatrical crisp American tenor)
-          const emhPreferred = ['Microsoft Mark', 'Google US English', 'Alex', 'en-US'];
+          const emhPreferred = [
+            'Microsoft Guy Online (Natural)', 'Microsoft Roger', 'Microsoft Richard',
+            'Microsoft Mark', 'Arthur', 'Google US English', 'en-US'
+          ];
           for (const pref of emhPreferred) {
             const match = voices.find(v => (v.name && v.name.toLowerCase().includes(pref.toLowerCase())) || (v.lang && v.lang.toLowerCase().includes(pref.toLowerCase())));
             if (match) {
@@ -338,6 +345,55 @@ class HolodeckAudio {
       gain2.connect(output);
       osc2.start(now + 0.045);
       osc2.stop(now + 0.095);
+    } catch(e) {}
+  }
+
+  playSiskoCommsChime() {
+    if (this.isMuted || !this.soundEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const vol = this.getVolumeScale();
+      const output = this.getMasterNode();
+      if (!output) return;
+
+      // Defiant bridge intercom dual-tone sub-bass click (140Hz fundamental + 280Hz octave)
+      const freqs = [140, 280];
+      freqs.forEach((f, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.7, now + 0.07);
+        gain.gain.setValueAtTime((0.20 / (i + 1)) * vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        osc.connect(gain);
+        gain.connect(output);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      });
+    } catch(e) {}
+  }
+
+  playEMHEmitterChime() {
+    if (this.isMuted || !this.soundEnabled || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const vol = this.getVolumeScale();
+      const output = this.getMasterNode();
+      if (!output) return;
+
+      // Mobile emitter photonic chirp (crystalline high sweep 2600Hz -> 3800Hz)
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(2600, now);
+      osc.frequency.exponentialRampToValueAtTime(3800, now + 0.05);
+      gain.gain.setValueAtTime(0.14 * vol, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      osc.connect(gain);
+      gain.connect(output);
+      osc.start(now);
+      osc.stop(now + 0.05);
     } catch(e) {}
   }
 
@@ -987,24 +1043,29 @@ class HolodeckAudio {
       return;
     }
 
-    // 3. Captain Benjamin Sisko Persona (Deep baritone, commanding, deliberate)
+    // Contextual stress classification
+    const isUrgent = ['incoming_attack', 'shield_damaged', 'containment_breach', 'time_expired'].includes(soundKey);
+    const isVictory = ['target_vaporized', 'distractor_eliminated', 'simulation_complete'].includes(soundKey);
+    const context = isUrgent ? 'urgent' : (isVictory ? 'victory' : 'calm');
+
+    // 3. Captain Benjamin Sisko Persona (Deep baritone, syncopated cadence, Avery Brooks delivery)
     if (this.voicePersona === 'sisko') {
       const siskoPhrases = {
         engage_simulation: fallbackText || 'Captain Sisko here. Threat vectors plotted. Prepare quantum blasters.',
         incoming_attack: 'Incoming torpedo! All hands brace for impact!',
-        target_vaporized: 'Target eliminated. Stand firm, crew!',
+        target_vaporized: 'Target eliminated. Stand firm, crew! Keep the pressure on them.',
         warp_jump: fallbackText || 'Maximum warp. Let us see what is waiting for us in the next sector.',
         shield_damaged: 'Shields taking heavy fire! Reroute emergency power to forward emitters!',
-        containment_breach: 'Containment breach! Abandon holodeck!',
-        sensor_jam: 'Sensor jam active. Tactical field distorted.',
-        distractor_eliminated: 'Distractor down. Keep firing on the prime target!',
-        time_expired: 'Time has expired! We cannot afford hesitation in combat!',
+        containment_breach: 'Containment breach! Abandon holodeck immediately!',
+        sensor_jam: 'Sensor jam active. Tactical field distorted. Hold your ground.',
+        distractor_eliminated: 'Distractor down. Maintain your focus on the primary target!',
+        time_expired: 'Time has expired! In battle, hesitation will cost us everything!',
         simulation_complete: 'Simulation terminated. Outstanding tactical execution, Commander.',
-        visualizer_engaged: 'Astrometric visualizer on main viewer.',
-        visualizer_off: 'Visualizer disengaged.'
+        visualizer_engaged: 'Astrometric visualizer on main viewer. Study the vectors.',
+        visualizer_off: 'Visualizer disengaged. Helm, prepare for combat.'
       };
       const textToSpeak = siskoPhrases[soundKey] || fallbackText;
-      if (textToSpeak) this.speak(textToSpeak, false);
+      if (textToSpeak) this.speak(textToSpeak, true, context);
       return;
     }
 
@@ -1025,28 +1086,28 @@ class HolodeckAudio {
         visualizer_off: 'Visualizer closed. Focusing on tactical telemetry.'
       };
       const textToSpeak = bashirPhrases[soundKey] || fallbackText;
-      if (textToSpeak) this.speak(textToSpeak, false);
+      if (textToSpeak) this.speak(textToSpeak, false, context);
       return;
     }
 
     // 5. The EMH Hologram Doctor Persona (Voyager EMH, crisp, theatrical, pedantic, operatic)
     if (this.voicePersona === 'emh') {
       const emhPhrases = {
-        engage_simulation: fallbackText || 'Please state the nature of the mathematical emergency! Emergency Hologram online.',
+        engage_simulation: fallbackText || 'Please state the nature of the mathematical emergency! Emergency Medical Hologram online.',
         incoming_attack: 'Warning! Incoming ordnance! Must I remind you that I am non-corporeal?!',
         target_vaporized: 'I am a doctor, not an artillery officer! But that calculation was surgical.',
-        warp_jump: fallbackText || 'Warp speed engaged. Try not to induce warp sickness, if you please.',
+        warp_jump: fallbackText || 'Warp velocity engaged. Try not to induce warp sickness, if you please.',
         shield_damaged: 'Containment shield breach! Must I do everything myself around here?!',
-        containment_breach: 'Containment failure! Holodeck safety protocols disengaged!',
-        sensor_jam: 'Temporal sensors jammed. You are welcome. Now back to my diagnostic routines.',
+        containment_breach: 'Containment failure! Holodeck safety protocols disengaged! Someone save my mobile emitter!',
+        sensor_jam: 'Temporal sensors jammed. You are welcome. Now, back to my diagnostic routines.',
         distractor_eliminated: 'Distractor eliminated! Clean incision.',
         time_expired: 'Chronometer expired! Your hesitation is medically hazardous!',
         simulation_complete: 'Simulation terminated. Your arithmetic was surprisingly adequate.',
         visualizer_engaged: 'Visualizer active. Do try to pay attention to the graph.',
-        visualizer_off: 'Visualizer offline.'
+        visualizer_off: 'Visualizer offline. Triage complete.'
       };
       const textToSpeak = emhPhrases[soundKey] || fallbackText;
-      if (textToSpeak) this.speak(textToSpeak, false);
+      if (textToSpeak) this.speak(textToSpeak, true, context);
       return;
     }
 
@@ -1090,16 +1151,16 @@ class HolodeckAudio {
     }
 
     if (this.voicePersona === 'commander') {
-      this.speak(`Correct value confirmed: ${answerVal}. Tactical advantage secured.`, false);
+      this.speak(`Correct value confirmed: ${answerVal}. Tactical advantage secured.`, false, 'victory');
       return;
     } else if (this.voicePersona === 'sisko') {
-      this.speak(`Target confirmed and neutralized: ${answerVal}. Stand firm, crew.`, false);
+      this.speak(`Target confirmed... and neutralized: ${answerVal}. Stand firm, crew.`, true, 'victory');
       return;
     } else if (this.voicePersona === 'bashir') {
-      this.speak(`Mathematically brilliant: ${answerVal}. Genetic enhancements would approve.`, false);
+      this.speak(`Mathematically brilliant: ${answerVal}. Genetic enhancements would approve.`, false, 'victory');
       return;
     } else if (this.voicePersona === 'emh') {
-      this.speak(`Surgical precision: ${answerVal}. I am a doctor, not an artillery officer!`, false);
+      this.speak(`Surgical precision: ${answerVal}. Remember; I am a doctor, not an abacus!`, true, 'victory');
       return;
     }
 
@@ -1148,10 +1209,14 @@ class HolodeckAudio {
     }
   }
 
-  speak(text, playChirp = true) {
+  speak(text, playChirp = true, context = 'calm') {
     if (this.isMuted || !this.voiceEnabled || !this.synth) return;
     try {
-      if (playChirp && this.voicePersona === 'computer') this.playComputerChirp();
+      if (playChirp) {
+        if (this.voicePersona === 'computer') this.playComputerChirp();
+        else if (this.voicePersona === 'sisko') this.playSiskoCommsChime();
+        else if (this.voicePersona === 'emh') this.playEMHEmitterChime();
+      }
       
       // Chromium speech watchdog: un-pause if engine stalled
       if (this.synth.paused) {
@@ -1159,7 +1224,17 @@ class HolodeckAudio {
       }
       try { this.synth.cancel(); } catch(e) {}
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Runtime prosodic cadence sculpting
+      let speechText = text;
+      if (this.voicePersona === 'sisko') {
+        // Avery Brooks theatrical syncopation: inject deliberate pauses at punctuation
+        speechText = text.replace(/([.!?])\s+/g, '$1... ').replace(/,\s+/g, '... ');
+      } else if (this.voicePersona === 'emh') {
+        // Robert Picardo theatrical enunciation: crisp operatic separation
+        speechText = text.replace(/([;!?])\s+/g, '$1 ');
+      }
+
+      const utterance = new SpeechSynthesisUtterance(speechText);
       this.activeUtterance = utterance; // Pin reference to prevent GC drops
       
       const volScale = this.getVolumeScale();
@@ -1170,8 +1245,17 @@ class HolodeckAudio {
         utterance.volume = 0.95 * volScale;
       } else if (this.voicePersona === 'sisko') {
         if (this.siskoVoice) utterance.voice = this.siskoVoice;
-        utterance.pitch = 0.78; // Deep, commanding, resonant baritone
-        utterance.rate = 0.93;  // Deliberate, rhythmic, dramatic cadence
+        // Dynamic prosody: Avery Brooks deepens under combat stress, deliberate syncopated cadence
+        if (context === 'urgent') {
+          utterance.pitch = 0.72; // Maximum deep baritone rumble
+          utterance.rate = 0.89;  // Heavy, deliberate, commanding
+        } else if (context === 'victory') {
+          utterance.pitch = 0.80; // Resonant assertive peak
+          utterance.rate = 0.96;
+        } else {
+          utterance.pitch = 0.76;
+          utterance.rate = 0.92;
+        }
         utterance.volume = 1.0 * volScale;
       } else if (this.voicePersona === 'bashir') {
         if (this.bashirVoice) utterance.voice = this.bashirVoice;
@@ -1180,8 +1264,17 @@ class HolodeckAudio {
         utterance.volume = 0.95 * volScale;
       } else if (this.voicePersona === 'emh') {
         if (this.emhVoice) utterance.voice = this.emhVoice;
-        utterance.pitch = 1.04; // Crisp, theatrical enunciation
-        utterance.rate = 1.03;  // Operatic, pedantic, precise diction
+        // Dynamic prosody: Robert Picardo operatic tenor, speeds up in urgent triage
+        if (context === 'urgent') {
+          utterance.pitch = 1.12; // High-strung, exasperated diagnostic tenor
+          utterance.rate = 1.16;  // Fast, urgent triage pace
+        } else if (context === 'victory') {
+          utterance.pitch = 1.06; // Proud, self-satisfied operatic lilt
+          utterance.rate = 1.02;
+        } else {
+          utterance.pitch = 1.04;
+          utterance.rate = 0.98;  // Pompous lecturing cadence
+        }
         utterance.volume = 0.98 * volScale;
       } else {
         // LCARS Computer

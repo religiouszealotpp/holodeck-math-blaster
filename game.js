@@ -5140,14 +5140,67 @@ class HolodeckGame {
             selfBrowserSurface: 'include',
             systemAudio: 'include'
           });
-          videoStream = displayStream;
+          this.recDisplayStream = displayStream;
+
           const vTrack = displayStream.getVideoTracks()[0];
+          let rawW = window.innerWidth;
+          let rawH = window.innerHeight;
           if (vTrack) {
             const settings = vTrack.getSettings ? vTrack.getSettings() : {};
-            captureRes = (settings.width && settings.height) ? `${settings.width}x${settings.height}` : `${window.innerWidth}x${window.innerHeight}`;
+            if (settings.width && settings.height) {
+              rawW = settings.width;
+              rawH = settings.height;
+            }
             vTrack.onended = () => {
               if (this.isRecording) this.stopRecording();
             };
+          }
+
+          // Anti-Green Screen Sanitizer: Enforce strictly even integer dimensions (multiples of 2)
+          // Hardware H.264 / NV12 chroma subsamplers glitch and flash green when dimensions are odd
+          const cleanW = Math.max(320, Math.floor(rawW / 2) * 2);
+          const cleanH = Math.max(240, Math.floor(rawH / 2) * 2);
+          captureRes = `${cleanW}x${cleanH}`;
+
+          // Create or reuse hidden relay video element
+          if (!this.tabRelayVideo) {
+            this.tabRelayVideo = document.createElement('video');
+            this.tabRelayVideo.muted = true;
+            this.tabRelayVideo.playsInline = true;
+            this.tabRelayVideo.autoplay = true;
+          }
+          this.tabRelayVideo.srcObject = displayStream;
+          try {
+            await this.tabRelayVideo.play();
+          } catch(e) {}
+
+          // Create or reuse relay canvas with alpha disabled to prevent YUV zero green bleed
+          if (!this.tabRelayCanvas) {
+            this.tabRelayCanvas = document.createElement('canvas');
+          }
+          this.tabRelayCanvas.width = cleanW;
+          this.tabRelayCanvas.height = cleanH;
+          const relayCtx = this.tabRelayCanvas.getContext('2d', { alpha: false, desynchronized: true });
+
+          // Start steady rendering loop to guarantee fixed framerate and opaque background
+          const drawTabFrame = () => {
+            if (!this.isRecording || this.recSource !== 'tab') return;
+            if (this.tabRelayVideo && this.tabRelayVideo.readyState >= 2) {
+              if (relayCtx) {
+                relayCtx.fillStyle = '#000000'; // Guaranteed opaque black base
+                relayCtx.fillRect(0, 0, cleanW, cleanH);
+                relayCtx.drawImage(this.tabRelayVideo, 0, 0, cleanW, cleanH);
+              }
+            }
+            this.tabRelayAnimId = requestAnimationFrame(drawTabFrame);
+          };
+          if (this.tabRelayAnimId) cancelAnimationFrame(this.tabRelayAnimId);
+          this.tabRelayAnimId = requestAnimationFrame(drawTabFrame);
+
+          // Capture smooth, perfectly aligned canvas stream - immune to NV12 green flickering!
+          videoStream = this.tabRelayCanvas.captureStream ? this.tabRelayCanvas.captureStream(targetFPS) : null;
+          if (!videoStream) {
+            videoStream = displayStream;
           }
         } catch(e) {
           if (e.name !== 'NotAllowedError') {
@@ -5187,7 +5240,7 @@ class HolodeckGame {
         ]);
       }
 
-      // 3. Select Pure H.264 MP4 Video Codec
+      // 3. Select Video Codec (Pure H.264 MP4 with WebM Safe Mode Fallback)
       const preferredCodec = this.recPreferredCodec || 'h264';
       let selectedMime = '';
       const codecCandidates = {
@@ -5195,11 +5248,23 @@ class HolodeckGame {
           'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
           'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
           'video/mp4;codecs=avc1',
-          'video/mp4'
+          'video/mp4',
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm'
         ],
         h264_high: [
           'video/mp4;codecs=avc1.64002a,mp4a.40.2',
           'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
+          'video/mp4;codecs=avc1',
+          'video/mp4',
+          'video/webm;codecs=vp9,opus',
+          'video/webm'
+        ],
+        webm: [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm',
           'video/mp4;codecs=avc1',
           'video/mp4'
         ]
@@ -5209,6 +5274,7 @@ class HolodeckGame {
         ...(codecCandidates[preferredCodec] || []),
         ...codecCandidates.h264,
         ...codecCandidates.h264_high,
+        ...codecCandidates.webm,
         'video/mp4'
       ];
 
@@ -5266,6 +5332,22 @@ class HolodeckGame {
     if (!this.isRecording || !this.mediaRecorder) return;
     this.isRecording = false;
     if (this.recTimerInterval) clearInterval(this.recTimerInterval);
+    if (this.tabRelayAnimId) {
+      cancelAnimationFrame(this.tabRelayAnimId);
+      this.tabRelayAnimId = null;
+    }
+    if (this.tabRelayVideo) {
+      try {
+        this.tabRelayVideo.pause();
+        this.tabRelayVideo.srcObject = null;
+      } catch(e) {}
+    }
+    if (this.recDisplayStream) {
+      try {
+        this.recDisplayStream.getTracks().forEach(t => t.stop());
+      } catch(e) {}
+      this.recDisplayStream = null;
+    }
     if (this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
     }
@@ -5370,13 +5452,13 @@ class HolodeckGame {
         elStatus.innerText = '🔴 RECORDING ACTIVE';
         elStatus.style.color = '#ff3355';
       }
-      if (elCodec) elCodec.innerText = this.activeRecordingMime || 'H.264 (video/mp4; codecs=avc1)';
+      if (elCodec) elCodec.innerText = this.activeRecordingMime || (this.recPreferredCodec === 'webm' ? 'VP9 (video/webm)' : 'H.264 (video/mp4; codecs=avc1)');
     } else {
       if (elStatus) {
         elStatus.innerText = 'READY // STANDBY';
         elStatus.style.color = '#33ff88';
       }
-      if (elCodec) elCodec.innerText = 'H.264 (video/mp4; codecs=avc1)';
+      if (elCodec) elCodec.innerText = this.recPreferredCodec === 'webm' ? 'VP9 (video/webm; codecs=vp9)' : 'H.264 (video/mp4; codecs=avc1)';
     }
   }
 
@@ -5432,7 +5514,8 @@ class HolodeckGame {
     this.updateRecordingTelemetry(true);
     const codecLabels = {
       h264: 'H.264 (UNIVERSAL MP4)',
-      h264_high: 'H.264 HIGH PROFILE (MP4)'
+      h264_high: 'H.264 HIGH PROFILE (MP4)',
+      webm: 'VP9 (WEBM SAFE MODE)'
     };
     this.showBanner(`🎞️ VIDEO FORMAT: ${codecLabels[codec] || codec.toUpperCase()}`);
   }
