@@ -126,6 +126,7 @@ class HolodeckGame {
     this.mouse = new THREE.Vector2(0, 0);
 
     this.initDOMCache();
+    this.initInteractionLogger();
     this.initThree();
     this.bindEvents();
     this.initTooltips();
@@ -193,6 +194,46 @@ class HolodeckGame {
       ttBody: document.getElementById('tt-body'),
       ttNote: document.getElementById('tt-note')
     };
+  }
+
+  initInteractionLogger() {
+    if (typeof window === 'undefined') return;
+    window.lcarsBlackBox = window.lcarsBlackBox || [];
+    window.ENABLE_INTERACTION_LOGS = (typeof window.ENABLE_INTERACTION_LOGS !== 'undefined') ? window.ENABLE_INTERACTION_LOGS : true;
+
+    this.logInteraction = (type, detail) => {
+      const timestamp = (typeof performance !== 'undefined' && performance.now) 
+        ? (performance.now() / 1000).toFixed(3)
+        : '0.000';
+      const entry = { time: timestamp, type, detail };
+      window.lcarsBlackBox.push(entry);
+      if (window.lcarsBlackBox.length > 100) window.lcarsBlackBox.shift();
+      if (window.ENABLE_INTERACTION_LOGS || DEBUG_LOGS) {
+        console.log(`[LCARS Black Box] [${timestamp}s] ${type.toUpperCase()} -> ${detail}`);
+      }
+    };
+
+    window.getInteractionLog = () => {
+      if (console && console.table) console.table(window.lcarsBlackBox);
+      return window.lcarsBlackBox;
+    };
+
+    // Global click and tap logger
+    window.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!target) return;
+      const el = target.closest('button, .clcars-ammo-pill, .lcars-dropdown-item, .hud-sector-block, .vis-close-btn, .modal-backdrop');
+      if (el) {
+        const id = el.id ? `#${el.id}` : (el.className ? `.${el.className.split(' ')[0]}` : el.tagName);
+        const text = (el.innerText || '').trim().replace(/\s+/g, ' ').substring(0, 28);
+        this.logInteraction('click', `${id} ("${text}")`);
+      }
+    }, { capture: true });
+
+    // Global keydown logger
+    window.addEventListener('keydown', (e) => {
+      this.logInteraction('keydown', `Key '${e.key}' (code: ${e.code || e.key})`);
+    }, { capture: true });
   }
 
   triggerHaptic(type = 'tap') {
@@ -4928,14 +4969,25 @@ class HolodeckGame {
       if (!this.audio.voiceEnabled) {
         voiceBtn.classList.add('is-off');
         voiceBtn.innerText = '🎙️ VOICE: OFF [T]';
+        voiceBtn.style.color = '#888888';
       } else {
         voiceBtn.classList.remove('is-off');
-        if (this.audio.voicePersona === 'commander') {
+        const p = this.audio.voicePersona;
+        if (p === 'commander') {
           voiceBtn.innerText = '🎙️ VOICE: COMMANDER [T]';
           voiceBtn.style.color = '#33ffaa';
-        } else {
+        } else if (p === 'computer') {
           voiceBtn.innerText = '🖥️ VOICE: COMPUTER [T]';
           voiceBtn.style.color = 'var(--voyager-periwinkle)';
+        } else if (p === 'sisko') {
+          voiceBtn.innerText = '🖖 VOICE: SISKO [T]';
+          voiceBtn.style.color = '#ffbb00';
+        } else if (p === 'bashir') {
+          voiceBtn.innerText = '🩺 VOICE: BASHIR [T]';
+          voiceBtn.style.color = '#00f0ff';
+        } else if (p === 'emh') {
+          voiceBtn.innerText = '🚑 VOICE: EMH DOCTOR [T]';
+          voiceBtn.style.color = '#ff66aa';
         }
       }
     }
@@ -4944,11 +4996,15 @@ class HolodeckGame {
   toggleVoicePersona() {
     const persona = this.audio.toggleVoicePersona();
     this.syncAudioUI();
-    if (persona === 'commander') {
-      this.showBanner('🎙️ VOICE MATRIX: TACTICAL COMMANDER (AUTHORITATIVE FEMALE)');
-    } else {
-      this.showBanner('🖥️ VOICE MATRIX: LCARS COMPUTER (MAJEL BARRETT)');
-    }
+    const bannerMap = {
+      commander: '🎙️ VOICE MATRIX: TACTICAL COMMANDER (AUTHORITATIVE FEMALE)',
+      computer: '🖥️ VOICE MATRIX: LCARS COMPUTER (MAJEL BARRETT)',
+      sisko: '🖖 VOICE MATRIX: CAPTAIN BENJAMIN SISKO (DEEP BARITONE)',
+      bashir: '🩺 VOICE MATRIX: DR. JULIAN BASHIR (BRITISH RP)',
+      emh: '🚑 VOICE MATRIX: EMH HOLOGRAM DOCTOR (ROBERT PICARDO)'
+    };
+    this.showBanner(bannerMap[persona] || '🎙️ VOICE MATRIX UPDATED');
+    if (this.logInteraction) this.logInteraction('voice', `Voice Persona set to: ${persona}`);
   }
 
   toggleVisualizer() {
@@ -6430,7 +6486,10 @@ class HolodeckGame {
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
+      const k = e.key.toLowerCase();
+
+      // [ESC] or [P] Pause / Resume Hotkey
+      if (e.key === 'Escape' || k === 'p') {
         const confirmAbortModal = document.getElementById('confirm-abort-modal');
         if (confirmAbortModal && !confirmAbortModal.classList.contains('hidden')) {
           confirmAbortModal.classList.add('hidden');
@@ -6444,8 +6503,6 @@ class HolodeckGame {
         this.togglePause();
         return;
       }
-
-      const k = e.key.toLowerCase();
 
       // [F] FPS / Render Stats Hotkey
       if (k === 'f') {
@@ -6471,12 +6528,13 @@ class HolodeckGame {
         return;
       }
 
-      // [T] Voice Persona Toggle Hotkey
+      // [R] Ricochet Sound Profile Hotkey
       if (k === 'r') {
         this.cycleRicochetSoundProfile();
         return;
       }
 
+      // [T] Voice Persona Toggle Hotkey
       if (k === 't') {
         this.toggleVoicePersona();
         return;
@@ -6488,8 +6546,8 @@ class HolodeckGame {
         return;
       }
 
-      // [P] or [Space] Phaser Disruptor Strike Hotkey
-      if (k === 'p' || e.key === ' ') {
+      // [Space] Phaser Disruptor Strike Hotkey
+      if (e.key === ' ') {
         e.preventDefault();
         this.activatePhaserStrike();
         return;

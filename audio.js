@@ -9,7 +9,11 @@ class HolodeckAudio {
     this.synth = (typeof window !== 'undefined' && window.speechSynthesis) ? window.speechSynthesis : null;
     this.computerVoice = null;
     this.commanderVoice = null;
-    this.voicePersona = "commander";
+    this.siskoVoice = null;
+    this.bashirVoice = null;
+    this.emhVoice = null;
+    this.activeUtterance = null;
+    this.voicePersona = "commander"; // 'commander', 'computer', 'sisko', 'bashir', 'emh'
     this.ricochetProfile = "tachyon_deflect"; // TACHYON DEFLECT default across all modes // 'baseline', 'harmonic', 'deep_bass', 'warp_ping', 'tachyon_deflect'
     this.isPaused = false;
 
@@ -95,7 +99,6 @@ class HolodeckAudio {
             'Microsoft Zira', 'Microsoft Jenny', 'Microsoft Aria', 'Google UK English Female',
             'Samantha', 'Victoria', 'Karen', 'Fiona', 'Moira', 'Google US English', 'en-US'
           ];
-
           for (const pref of commanderPreferred) {
             const match = voices.find(v => (v.name && v.name.toLowerCase().includes(pref.toLowerCase())) || (v.lang && v.lang.toLowerCase().includes(pref.toLowerCase())));
             if (match) {
@@ -118,6 +121,45 @@ class HolodeckAudio {
           }
           if (!this.computerVoice) {
             this.computerVoice = voices[0];
+          }
+
+          // 3. Captain Benjamin Sisko (Deep, commanding US baritone)
+          const siskoPreferred = ['Microsoft David', 'Microsoft Guy', 'Google US English Male', 'Alex', 'Fred', 'en-US'];
+          for (const pref of siskoPreferred) {
+            const match = voices.find(v => (v.name && v.name.toLowerCase().includes(pref.toLowerCase())) || (v.lang && v.lang.toLowerCase().includes(pref.toLowerCase())));
+            if (match) {
+              this.siskoVoice = match;
+              break;
+            }
+          }
+          if (!this.siskoVoice) {
+            this.siskoVoice = this.computerVoice || voices[0];
+          }
+
+          // 4. Dr. Julian Bashir (Cultured British RP)
+          const bashirPreferred = ['Google UK English Male', 'Microsoft George', 'Microsoft Ryan', 'Oliver', 'Daniel', 'en-GB', 'en_GB', 'British'];
+          for (const pref of bashirPreferred) {
+            const match = voices.find(v => (v.name && v.name.toLowerCase().includes(pref.toLowerCase())) || (v.lang && v.lang.toLowerCase().includes(pref.toLowerCase())));
+            if (match) {
+              this.bashirVoice = match;
+              break;
+            }
+          }
+          if (!this.bashirVoice) {
+            this.bashirVoice = voices.find(v => v.lang && (v.lang.includes('GB') || v.lang.includes('en-GB'))) || this.computerVoice || voices[0];
+          }
+
+          // 5. The EMH Hologram Doctor (Theatrical crisp American tenor)
+          const emhPreferred = ['Microsoft Mark', 'Google US English', 'Alex', 'en-US'];
+          for (const pref of emhPreferred) {
+            const match = voices.find(v => (v.name && v.name.toLowerCase().includes(pref.toLowerCase())) || (v.lang && v.lang.toLowerCase().includes(pref.toLowerCase())));
+            if (match) {
+              this.emhVoice = match;
+              break;
+            }
+          }
+          if (!this.emhVoice) {
+            this.emhVoice = this.computerVoice || voices[0];
           }
         } catch(e) {}
       };
@@ -142,10 +184,12 @@ class HolodeckAudio {
       try { this.synth.cancel(); } catch(e) {}
     }
 
-    this.voicePersona = this.voicePersona === 'commander' ? 'computer' : 'commander';
+    const order = ['commander', 'computer', 'sisko', 'bashir', 'emh'];
+    const currentIdx = order.indexOf(this.voicePersona);
+    this.voicePersona = order[(currentIdx + 1) % order.length];
     
     // Ensure synthesizer voices are loaded
-    if (this.synth && (!this.commanderVoice || !this.computerVoice)) {
+    if (this.synth) {
       this.initVoices();
     }
 
@@ -153,8 +197,14 @@ class HolodeckAudio {
     if (!this.isMuted && this.voiceEnabled) {
       if (this.voicePersona === 'commander') {
         this.speak('Tactical Commander voice matrix active. Ready for combat simulation.', false);
-      } else {
+      } else if (this.voicePersona === 'computer') {
         this.speak('LCARS computer voice interface online.', true);
+      } else if (this.voicePersona === 'sisko') {
+        this.speak('Captain Sisko here. Threat vectors plotted. Prepare quantum blasters.', false);
+      } else if (this.voicePersona === 'bashir') {
+        this.speak('Dr. Bashir here. My genetic enhancements suggest that answer was mathematically inevitable.', false);
+      } else if (this.voicePersona === 'emh') {
+        this.speak('Please state the nature of the mathematical emergency! EMH matrix online.', false);
       }
     }
 
@@ -166,18 +216,44 @@ class HolodeckAudio {
     try {
       this.synth.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
+      this.activeUtterance = utterance;
+
       if (persona === 'commander' && this.commanderVoice) {
         utterance.voice = this.commanderVoice;
-        utterance.pitch = 0.95;
-        utterance.rate = 1.08;
+        utterance.pitch = 0.96;
+        utterance.rate = 1.05;
+        utterance.volume = 1.0;
+      } else if (persona === 'sisko' && this.siskoVoice) {
+        utterance.voice = this.siskoVoice;
+        utterance.pitch = 0.78;
+        utterance.rate = 0.93;
+        utterance.volume = 1.0;
+      } else if (persona === 'bashir' && this.bashirVoice) {
+        utterance.voice = this.bashirVoice;
+        utterance.pitch = 1.06;
+        utterance.rate = 1.10;
+        utterance.volume = 1.0;
+      } else if (persona === 'emh' && this.emhVoice) {
+        utterance.voice = this.emhVoice;
+        utterance.pitch = 1.04;
+        utterance.rate = 1.03;
         utterance.volume = 1.0;
       } else if (this.computerVoice) {
         utterance.voice = this.computerVoice;
-        utterance.pitch = 1.12;
-        utterance.rate = 0.94;
+        utterance.pitch = 1.10;
+        utterance.rate = 0.95;
         utterance.volume = 0.95;
       }
-      this.synth.speak(utterance);
+
+      utterance.onend = () => { this.activeUtterance = null; };
+      utterance.onerror = () => { this.activeUtterance = null; };
+
+      setTimeout(() => {
+        try {
+          if (this.synth.paused) this.synth.resume();
+          this.synth.speak(utterance);
+        } catch(e) {}
+      }, 25);
     } catch(e) {}
   }
 
@@ -907,13 +983,74 @@ class HolodeckAudio {
         visualizer_off: 'Tactical visualizer offline.'
       };
       const textToSpeak = commanderPhrases[soundKey] || fallbackText;
-      if (textToSpeak) {
-        this.speak(textToSpeak, false);
-      }
+      if (textToSpeak) this.speak(textToSpeak, false);
       return;
     }
 
-    // 3. LCARS Computer Persona: Try classic MP3 clip first, fall back to Computer synth
+    // 3. Captain Benjamin Sisko Persona (Deep baritone, commanding, deliberate)
+    if (this.voicePersona === 'sisko') {
+      const siskoPhrases = {
+        engage_simulation: fallbackText || 'Captain Sisko here. Threat vectors plotted. Prepare quantum blasters.',
+        incoming_attack: 'Incoming torpedo! All hands brace for impact!',
+        target_vaporized: 'Target eliminated. Stand firm, crew!',
+        warp_jump: fallbackText || 'Maximum warp. Let us see what is waiting for us in the next sector.',
+        shield_damaged: 'Shields taking heavy fire! Reroute emergency power to forward emitters!',
+        containment_breach: 'Containment breach! Abandon holodeck!',
+        sensor_jam: 'Sensor jam active. Tactical field distorted.',
+        distractor_eliminated: 'Distractor down. Keep firing on the prime target!',
+        time_expired: 'Time has expired! We cannot afford hesitation in combat!',
+        simulation_complete: 'Simulation terminated. Outstanding tactical execution, Commander.',
+        visualizer_engaged: 'Astrometric visualizer on main viewer.',
+        visualizer_off: 'Visualizer disengaged.'
+      };
+      const textToSpeak = siskoPhrases[soundKey] || fallbackText;
+      if (textToSpeak) this.speak(textToSpeak, false);
+      return;
+    }
+
+    // 4. Dr. Julian Bashir Persona (Cultured British RP, enthusiastic, mathematically brilliant)
+    if (this.voicePersona === 'bashir') {
+      const bashirPhrases = {
+        engage_simulation: fallbackText || 'Dr. Bashir here. My genetic enhancements suggest this simulation is mathematically inevitable.',
+        incoming_attack: 'Incoming projectile! Defensive action strongly advised!',
+        target_vaporized: 'Splendid shot! Statistical probability of success was only 34 percent, but you did it!',
+        warp_jump: fallbackText || 'Warp velocity achieved! Fascinating stellar readings in this sector.',
+        shield_damaged: 'Hold on! Containment shields are degrading. Let us patch that plasma conduit!',
+        containment_breach: 'Containment collapse! Medical team on standby!',
+        sensor_jam: 'Temporal dilation active! Fascinating effect on their velocity vectors.',
+        distractor_eliminated: 'Distractor vaporized! One less variable in our equation.',
+        time_expired: 'Good heavens, time has run out! Deflector containment is buckling!',
+        simulation_complete: 'Simulation complete! Statistically, an extraordinary intellectual performance.',
+        visualizer_engaged: 'Mathematical visualizer initialized.',
+        visualizer_off: 'Visualizer closed. Focusing on tactical telemetry.'
+      };
+      const textToSpeak = bashirPhrases[soundKey] || fallbackText;
+      if (textToSpeak) this.speak(textToSpeak, false);
+      return;
+    }
+
+    // 5. The EMH Hologram Doctor Persona (Voyager EMH, crisp, theatrical, pedantic, operatic)
+    if (this.voicePersona === 'emh') {
+      const emhPhrases = {
+        engage_simulation: fallbackText || 'Please state the nature of the mathematical emergency! Emergency Hologram online.',
+        incoming_attack: 'Warning! Incoming ordnance! Must I remind you that I am non-corporeal?!',
+        target_vaporized: 'I am a doctor, not an artillery officer! But that calculation was surgical.',
+        warp_jump: fallbackText || 'Warp speed engaged. Try not to induce warp sickness, if you please.',
+        shield_damaged: 'Containment shield breach! Must I do everything myself around here?!',
+        containment_breach: 'Containment failure! Holodeck safety protocols disengaged!',
+        sensor_jam: 'Temporal sensors jammed. You are welcome. Now back to my diagnostic routines.',
+        distractor_eliminated: 'Distractor eliminated! Clean incision.',
+        time_expired: 'Chronometer expired! Your hesitation is medically hazardous!',
+        simulation_complete: 'Simulation terminated. Your arithmetic was surprisingly adequate.',
+        visualizer_engaged: 'Visualizer active. Do try to pay attention to the graph.',
+        visualizer_off: 'Visualizer offline.'
+      };
+      const textToSpeak = emhPhrases[soundKey] || fallbackText;
+      if (textToSpeak) this.speak(textToSpeak, false);
+      return;
+    }
+
+    // 6. LCARS Computer Persona: Try classic MP3 clip first, fall back to Computer synth
     this.playComputerChirp();
     try {
       let audio = this.audioCache[soundKey];
@@ -952,9 +1089,17 @@ class HolodeckAudio {
       try { this.synth.cancel(); } catch(e) {}
     }
 
-    // Tactical Commander voice
     if (this.voicePersona === 'commander') {
-      this.speak(`Correct value confirmed: ${answerVal}.`, false);
+      this.speak(`Correct value confirmed: ${answerVal}. Tactical advantage secured.`, false);
+      return;
+    } else if (this.voicePersona === 'sisko') {
+      this.speak(`Target confirmed and neutralized: ${answerVal}. Stand firm, crew.`, false);
+      return;
+    } else if (this.voicePersona === 'bashir') {
+      this.speak(`Mathematically brilliant: ${answerVal}. Genetic enhancements would approve.`, false);
+      return;
+    } else if (this.voicePersona === 'emh') {
+      this.speak(`Surgical precision: ${answerVal}. I am a doctor, not an artillery officer!`, false);
       return;
     }
 
@@ -1007,8 +1152,15 @@ class HolodeckAudio {
     if (this.isMuted || !this.voiceEnabled || !this.synth) return;
     try {
       if (playChirp && this.voicePersona === 'computer') this.playComputerChirp();
-      this.synth.cancel();
+      
+      // Chromium speech watchdog: un-pause if engine stalled
+      if (this.synth.paused) {
+        try { this.synth.resume(); } catch(e) {}
+      }
+      try { this.synth.cancel(); } catch(e) {}
+
       const utterance = new SpeechSynthesisUtterance(text);
+      this.activeUtterance = utterance; // Pin reference to prevent GC drops
       
       const volScale = this.getVolumeScale();
       if (this.voicePersona === 'commander') {
@@ -1016,13 +1168,38 @@ class HolodeckAudio {
         utterance.pitch = 0.96; // Authoritative, firm Starfleet tactical officer
         utterance.rate = 1.05;  // Crisp, smart tactical delivery
         utterance.volume = 0.95 * volScale;
+      } else if (this.voicePersona === 'sisko') {
+        if (this.siskoVoice) utterance.voice = this.siskoVoice;
+        utterance.pitch = 0.78; // Deep, commanding, resonant baritone
+        utterance.rate = 0.93;  // Deliberate, rhythmic, dramatic cadence
+        utterance.volume = 1.0 * volScale;
+      } else if (this.voicePersona === 'bashir') {
+        if (this.bashirVoice) utterance.voice = this.bashirVoice;
+        utterance.pitch = 1.06; // Cultured British RP, articulate, melodic
+        utterance.rate = 1.10;  // Quick, energetic, mathematically brilliant
+        utterance.volume = 0.95 * volScale;
+      } else if (this.voicePersona === 'emh') {
+        if (this.emhVoice) utterance.voice = this.emhVoice;
+        utterance.pitch = 1.04; // Crisp, theatrical enunciation
+        utterance.rate = 1.03;  // Operatic, pedantic, precise diction
+        utterance.volume = 0.98 * volScale;
       } else {
+        // LCARS Computer
         if (this.computerVoice) utterance.voice = this.computerVoice;
         utterance.pitch = 1.10; // Resonant Starfleet LCARS mainframe
         utterance.rate = 0.95;  // Measured computer cadence
         utterance.volume = 0.90 * volScale;
       }
-      this.synth.speak(utterance);
+
+      utterance.onend = () => { this.activeUtterance = null; };
+      utterance.onerror = () => { this.activeUtterance = null; };
+
+      setTimeout(() => {
+        try {
+          if (this.synth.paused) this.synth.resume();
+          this.synth.speak(utterance);
+        } catch(e) {}
+      }, 25);
     } catch(e) {}
   }
 }
